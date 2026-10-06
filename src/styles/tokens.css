@@ -1,0 +1,57 @@
+/* Design tokens — high-contrast, sunlight-readable palette. */
+:root {
+  --bg: #eef1f5;
+  --surface: #ffffff;
+  --surface-2: #f6f8fb;
+  --text: #0a0f1a;
+  --text-muted: #3d4757;
+  --border: #b9c3d0;
+  --border-strong: #6b7788;
+
+  --primary: #0b3d91;
+  --primary-hover: #082f70;
+  --primary-contrast: #ffffff;
+  --focus: #ffb000;
+
+  --in-bg: #0b3d91;
+  --in-text: #ffffff;
+  --row-in-bg: #dfe9ff;
+  --row-in-bar: #0b3d91;
+
+  --ok: #06652a;
+  --ok-bg: #d7f5e1;
+  --warn: #7a4a00;
+  --warn-bg: #ffe9a8;
+  --danger: #a3001b;
+  --danger-bg: #ffdadf;
+  --critical-bg: #a3001b;
+  --critical-text: #ffffff;
+  --muted-bg: #e4e8ee;
+
+  --radius-sm: 6px;
+  --radius: 10px;
+  --radius-lg: 14px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  --tap: 48px;
+  --tap-lg: 60px;
+
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-size: 17px;
+
+  --shadow: 0 1px 2px rgba(10, 15, 26, 0.12), 0 2px 8px rgba(10, 15, 26, 0.08);
+  --shadow-lg: 0 8px 30px rgba(10, 15, 26, 0.25);
+
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+
+  --max-width: 720px;
+}
