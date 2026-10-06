@@ -1,0 +1,74 @@
+.report {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: var(--space-4);
+  background: #fff;
+  color: #000;
+}
+.report h1 {
+  font-size: 1.5rem;
+  margin-bottom: 4px;
+}
+.report-meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 4px 16px;
+  margin: var(--space-3) 0;
+  font-size: 0.95rem;
+}
+.report table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.9rem;
+}
+.report th,
+.report td {
+  border: 1px solid #555;
+  padding: 4px 6px;
+  text-align: left;
+}
+.report th {
+  background: #eee;
+}
+.report td.num,
+.report th.num {
+  text-align: right;
+}
+.report .short-row td {
+  font-weight: 700;
+}
+.signature-lines {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-6);
+  margin-top: var(--space-6);
+}
+.signature-lines div {
+  border-top: 1px solid #000;
+  padding-top: 4px;
+  font-size: 0.85rem;
+}
+
+@media print {
+  @page {
+    margin: 12mm;
+  }
+  body {
+    background: #fff;
+  }
+  .no-print,
+  .toast-region {
+    display: none !important;
+  }
+  .report {
+    padding: 0;
+    max-width: none;
+  }
+  .report table {
+    page-break-inside: auto;
+  }
+  .report tr {
+    page-break-inside: avoid;
+  }
+}
