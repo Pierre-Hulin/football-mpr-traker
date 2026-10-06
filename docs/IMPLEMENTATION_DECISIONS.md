@@ -8,11 +8,11 @@ Deviations from `MPR-PRD.md`, `01_DATA_MODEL.md`, `02_SCREEN_FLOW.md` and `03_IM
 - **Reason:** Under the literal rule, every short player turned critical at the start of Q4. In testing, 13 players at 7/8 showed CRITICAL with a full quarter left, so the tier no longer pointed at the players who actually needed help.
 - **Impact:** Every short player is still flagged in the deadline quarter, so nobody slips through. Critical is kept for players who are actually in trouble. The thresholds are in `DEFAULT_RISK_CONFIG` (`src/domain/services/riskEngine.ts`).
 
-## 2. Boolean compound indexes
-- **Original:** Dexie schema includes `[teamId+activeOnTeam]` and `[gameId+voided]`.
-- **Choice:** Kept in the schema for parity, but never queried. Filtering on those fields happens in memory.
-- **Reason:** IndexedDB cannot index boolean values, so records are silently left out of those indexes.
-- **Impact:** None at the expected data sizes.
+## 2. Boolean fields are not indexed
+- **Original:** Dexie schema includes `[teamId+activeOnTeam]` on `players` and `[gameId+voided]` on `plays`.
+- **Choice:** Both index declarations were removed from the v1 schema. The fields `Player.activeOnTeam` and `Play.voided` are unchanged, but they are intentionally not indexed. Queries load by `teamId` or `gameId` and filter on these fields in memory.
+- **Reason:** IndexedDB cannot use boolean values as index keys, so records are silently left out of such indexes and the indexes could never be used. The v1 schema was changed directly, with no migration, because the app had not been deployed and no IndexedDB data exists in production.
+- **Impact:** None at the expected data sizes. A roster holds tens of players and a game around a hundred plays.
 
 ## 3. Command file grouping
 - **Original:** One file per command (`createTeam.ts`, `createPlayer.ts`, …).

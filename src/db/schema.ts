@@ -1,9 +1,9 @@
 /**
  * IndexedDB schema definitions (Dexie syntax). See 01_DATA_MODEL.md §7.
  *
- * Note: IndexedDB cannot index boolean values, so the compound indexes that
- * include `activeOnTeam` / `voided` are kept for spec parity but are never
- * queried; filtering on those fields happens in memory.
+ * Note: IndexedDB cannot use boolean values as index keys, so the boolean
+ * fields `Player.activeOnTeam` and `Play.voided` are intentionally not
+ * indexed; queries filter on them in memory.
  */
 export const DB_NAME = "mpr-tracker";
 
@@ -11,7 +11,7 @@ export const SCHEMA_VERSION = 1;
 
 export const SCHEMA_V1 = {
   teams: "id, name, updatedAt",
-  players: "id, teamId, [teamId+jerseyNumber], [teamId+activeOnTeam]",
+  players: "id, teamId, [teamId+jerseyNumber]",
   teamSettings: "teamId",
 
   games: "id, teamId, status, gameDate, [teamId+gameDate]",
@@ -22,7 +22,7 @@ export const SCHEMA_V1 = {
 
   currentLineupMembers: "id, gameId, playerId",
 
-  plays: "id, gameId, [gameId+playNumber], [gameId+quarter], [gameId+voided]",
+  plays: "id, gameId, [gameId+playNumber], [gameId+quarter]",
   playParticipants: "id, playId, gameId, playerId, [gameId+playerId]",
 
   gameEvents: "id, gameId, [gameId+createdAt], [gameId+type]",
