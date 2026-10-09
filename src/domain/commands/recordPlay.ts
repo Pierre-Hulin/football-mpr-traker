@@ -93,7 +93,8 @@ export async function recordPlay(input: RecordPlayInput): Promise<RecordPlayResu
         },
         createdAt: now,
       });
-      await touchGame(game, { nextPlayNumber: game.nextPlayNumber + 1 });
+      // A new snap makes any pre-Clear lineup snapshot stale.
+      await touchGame(game, { nextPlayNumber: game.nextPlayNumber + 1, clearedLineup: undefined });
       return { play, participantIds: participantPlayerIds };
     },
   );

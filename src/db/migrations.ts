@@ -10,6 +10,7 @@ export const DEFAULT_APP_SETTINGS: Omit<AppSettings, "createdAt" | "updatedAt"> 
   onboardingCompleted: false,
   keepScreenAwakeEnabled: true,
   preferredPlayerSort: "jersey",
+  liveRosterView: "list",
   defaultExpectedPlayersOnField: 11,
 };
 

@@ -3,6 +3,7 @@ import type {
   GamePlayerStatus,
   GameStatus,
   PlayCategory,
+  LiveRosterView,
   PlayerSort,
   PresetType,
 } from "./enums";
@@ -58,9 +59,18 @@ export interface Game {
   nextPlayNumber: number;
   startedAt?: string;
   completedAt?: string;
+  /** Lineup captured by the most recent Clear, restorable until it goes stale. */
+  clearedLineup?: ClearedLineupSnapshot;
   createdAt: string;
   updatedAt: string;
   revision: number;
+}
+
+export interface ClearedLineupSnapshot {
+  playerIds: string[];
+  clearedAt: string;
+  /** Game.nextPlayNumber at the moment of clearing. */
+  beforePlayNumber: number;
 }
 
 export interface GamePlayer {
@@ -149,6 +159,7 @@ export interface AppSettings {
   onboardingCompleted: boolean;
   keepScreenAwakeEnabled: boolean;
   preferredPlayerSort: PlayerSort;
+  liveRosterView: LiveRosterView;
   defaultExpectedPlayersOnField: number;
   createdAt: string;
   updatedAt: string;

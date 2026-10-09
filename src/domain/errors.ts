@@ -12,6 +12,7 @@ export type DomainErrorCode =
   | "PLAY_NOT_FOUND"
   | "PLAY_NUMBER_CONFLICT"
   | "NO_PLAY_TO_UNDO"
+  | "NO_LINEUP_TO_RESTORE"
   | "TEAM_NOT_FOUND"
   | "TEAM_HAS_GAMES"
   | "PLAYER_NOT_FOUND"
@@ -37,6 +38,7 @@ const defaultMessages: Record<DomainErrorCode, string> = {
   PLAY_NOT_FOUND: "That play could not be found.",
   PLAY_NUMBER_CONFLICT: "Another play already uses that play number.",
   NO_PLAY_TO_UNDO: "There is no play to undo.",
+  NO_LINEUP_TO_RESTORE: "There is no cleared lineup to restore.",
   TEAM_NOT_FOUND: "That team could not be found.",
   TEAM_HAS_GAMES: "This team has games recorded. Archive it instead.",
   PLAYER_NOT_FOUND: "That player could not be found.",

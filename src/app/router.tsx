@@ -11,6 +11,7 @@ import TeamSettingsPage from "../pages/TeamSettingsPage";
 import NewGamePage from "../pages/NewGamePage";
 import GameSetupPage from "../pages/GameSetupPage";
 import LiveGamePage from "../pages/LiveGamePage";
+import ManagePlayersPage from "../pages/ManagePlayersPage";
 import PlayHistoryPage from "../pages/PlayHistoryPage";
 import PlayDetailPage from "../pages/PlayDetailPage";
 import MprSummaryPage from "../pages/MprSummaryPage";
@@ -47,6 +48,7 @@ export const router = createBrowserRouter([
       { path: "/games/new", element: <NewGamePage /> },
       { path: "/games/:gameId/setup", element: <GameSetupPage /> },
       { path: "/games/:gameId/live", element: <LiveGamePage /> },
+      { path: "/games/:gameId/players", element: <ManagePlayersPage /> },
       { path: "/games/:gameId/history", element: <PlayHistoryPage /> },
       { path: "/games/:gameId/history/:playId", element: <PlayDetailPage /> },
       { path: "/games/:gameId/mpr", element: <MprSummaryPage /> },

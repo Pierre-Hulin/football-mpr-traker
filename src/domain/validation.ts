@@ -113,6 +113,13 @@ export const gameSchema = z.object({
   nextPlayNumber: z.number().int().min(1),
   startedAt: opt(z.string()),
   completedAt: opt(z.string()),
+  clearedLineup: opt(
+    z.object({
+      playerIds: z.array(z.string()),
+      clearedAt: z.string(),
+      beforePlayNumber: z.number().int(),
+    }),
+  ),
   createdAt: iso,
   updatedAt: iso,
   revision: z.number().int(),

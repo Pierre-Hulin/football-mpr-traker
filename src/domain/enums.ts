@@ -37,6 +37,7 @@ export const EVENT_TYPES = [
   "play_corrected",
   "lineup_preset_applied",
   "lineup_cleared",
+  "lineup_restored",
   "roster_imported",
   "game_exported",
   "manual_note",
@@ -85,6 +86,9 @@ export const NON_COUNTING_REASONS = [
   "League rule",
   "Other",
 ] as const;
+
+export const LIVE_ROSTER_VIEWS = ["list", "grid"] as const;
+export type LiveRosterView = (typeof LIVE_ROSTER_VIEWS)[number];
 
 export const PLAYER_SORTS = ["jersey", "name", "risk"] as const;
 export type PlayerSort = (typeof PLAYER_SORTS)[number];

@@ -3,6 +3,7 @@ import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
 import "../styles/live-game.css";
 import { Modal } from "../components/Modal/Modal";
 import { PlayerRow } from "../components/PlayerRow/PlayerRow";
+import { PlayerTile } from "../components/PlayerTile/PlayerTile";
 import { useToast } from "../components/Toast/ToastProvider";
 import { EmptyState, Loading } from "../components/ui";
 import { PRESET_TYPE_LABELS, PRESET_TYPE_SHORT, quarterLabel, type GamePlayerStatus } from "../domain/enums";
@@ -17,7 +18,7 @@ import { updateGamePlayerStatus } from "../domain/commands/updateGamePlayerStatu
 import {
   applyLineupPreset,
   clearCurrentLineup,
-  replaceCurrentLineup,
+  restoreClearedLineup,
   togglePlayerInLineup,
 } from "../domain/commands/setCurrentLineup";
 import { buildBackupFile } from "../domain/services/backupService";
@@ -206,22 +207,34 @@ export default function LiveGamePage() {
       .catch(reportError);
   };
 
-  const onClear = () => {
-    if (!gameId || !view) return;
-    const previous = view.rows.filter((r) => isIn(r.player.id)).map((r) => r.player.id);
-    enqueue(() => clearCurrentLineup(gameId))
-      .then(() => {
+  const onRestoreLineup = useCallback(() => {
+    if (!gameId) return;
+    enqueue(() => restoreClearedLineup(gameId))
+      .then((r) => {
         setOptimistic(new Map());
         toast.show({
-          message: "Lineup cleared",
-          actionLabel: previous.length ? "UNDO" : undefined,
-          onAction: previous.length
-            ? () => enqueue(() => replaceCurrentLineup(gameId, previous)).catch(reportError)
-            : undefined,
+          message: `Lineup restored · ${r.selectedCount} selected${r.skippedCount ? ` · ${r.skippedCount} unavailable` : ""}`,
+        });
+      })
+      .catch(reportError);
+  }, [gameId, enqueue, toast, reportError]);
+
+  const onClear = () => {
+    if (!gameId) return;
+    enqueue(() => clearCurrentLineup(gameId))
+      .then(({ clearedCount }) => {
+        setOptimistic(new Map());
+        toast.show({
+          message: clearedCount ? `Lineup cleared (${clearedCount})` : "Lineup is already empty",
+          actionLabel: clearedCount ? "UNDO" : undefined,
+          onAction: clearedCount ? onRestoreLineup : undefined,
         });
       })
       .catch(reportError);
   };
+
+  const toggleView = () =>
+    void updateAppSettings({ liveRosterView: settings.liveRosterView === "grid" ? "list" : "grid" }).catch(reportError);
 
   const onActivate = useCallback(
     (playerId: string) => {
@@ -335,6 +348,8 @@ export default function LiveGamePage() {
   const critical = view.atRisk.filter((r) => r.risk.level === "critical");
   const sheetView = sheetPlayerId ? view.rowsById.get(sheetPlayerId) : undefined;
   const countIcon = cs === "exact" ? "✓ " : cs === "under" ? "▼ " : "▲ ";
+  const isGrid = settings.liveRosterView === "grid";
+  const restoreCount = game.clearedLineup?.playerIds.length ?? 0;
 
   return (
     <div className="live">
@@ -403,42 +418,88 @@ export default function LiveGamePage() {
         </button>
       )}
 
-      <nav className="preset-bar" aria-label="Lineup presets">
-        {presets.map((p) => {
-          const short = PRESET_TYPE_SHORT[p.type];
-          const label = p.type !== "custom" && p.name === PRESET_TYPE_LABELS[p.type] && short ? short : p.name;
-          return (
+      <nav className="preset-bar" aria-label="Lineup actions">
+        <div className="preset-scroll">
+          {restoreCount > 0 && (
             <button
-              key={p.id}
               type="button"
-              className="preset-btn"
-              onClick={() => onPreset(p.id)}
-              aria-label={`Load ${p.name} preset`}
+              className="preset-btn restore"
+              onClick={onRestoreLineup}
+              aria-label={`Restore the ${restoreCount}-player lineup from before Clear`}
+              data-testid="restore-lineup"
             >
-              {label.toUpperCase()}
+              ↺ RESTORE {restoreCount}
             </button>
-          );
-        })}
-        <button type="button" className="preset-btn clear" onClick={onClear} aria-label="Clear lineup (mark everyone out)">
-          CLEAR
-        </button>
+          )}
+          {presets.map((p) => {
+            const short = PRESET_TYPE_SHORT[p.type];
+            const label = p.type !== "custom" && p.name === PRESET_TYPE_LABELS[p.type] && short ? short : p.name;
+            return (
+              <button
+                key={p.id}
+                type="button"
+                className="preset-btn"
+                onClick={() => onPreset(p.id)}
+                aria-label={`Load ${p.name} preset`}
+              >
+                {label.toUpperCase()}
+              </button>
+            );
+          })}
+        </div>
+        <div className="preset-fixed">
+          <button type="button" className="preset-btn clear" onClick={onClear} aria-label="Clear lineup (mark everyone out)">
+            CLEAR
+          </button>
+          <button
+            type="button"
+            className="view-toggle"
+            onClick={toggleView}
+            aria-label={isGrid ? "Switch to list view (names and details)" : "Switch to grid view (jersey numbers only)"}
+            data-testid="view-toggle"
+            data-view={settings.liveRosterView}
+          >
+            {isGrid ? <ListIcon /> : <GridIcon />}
+            <span>{isGrid ? "LIST" : "GRID"}</span>
+          </button>
+        </div>
       </nav>
 
-      <main className="roster" aria-label="Players">
-        <ul className="roster-list">
-          {view.rows.map((row) => (
-            <PlayerRow
-              key={row.player.id}
-              view={row}
-              inLineup={row.fieldEligible && isIn(row.player.id)}
-              flash={flashId === row.player.id}
-              onToggle={onToggle}
-              onOpen={setSheetPlayerId}
-              onActivate={onActivate}
-            />
-          ))}
-        </ul>
+      <main className={`roster ${isGrid ? "is-grid" : ""}`} aria-label="Players">
+        {isGrid ? (
+          <ul className="roster-grid" data-testid="roster-grid">
+            {view.rows.map((row) => (
+              <PlayerTile
+                key={row.player.id}
+                view={row}
+                inLineup={row.fieldEligible && isIn(row.player.id)}
+                flash={flashId === row.player.id}
+                onToggle={onToggle}
+                onOpen={setSheetPlayerId}
+              />
+            ))}
+          </ul>
+        ) : (
+          <ul className="roster-list" data-testid="roster-list">
+            {view.rows.map((row) => (
+              <PlayerRow
+                key={row.player.id}
+                view={row}
+                inLineup={row.fieldEligible && isIn(row.player.id)}
+                flash={flashId === row.player.id}
+                onToggle={onToggle}
+                onOpen={setSheetPlayerId}
+                onActivate={onActivate}
+              />
+            ))}
+          </ul>
+        )}
         {view.rows.length === 0 && <EmptyState title="No players in this game" />}
+        {isGrid && view.rows.length > 0 && (
+          <p className="grid-hint">
+            Tap a number for IN/OUT. Names, injuries and late arrivals: <Link to={`/games/${game.id}/players`}>Manage players</Link>
+          </p>
+        )}
       </main>
 
       <footer className="record-bar">
@@ -555,11 +616,18 @@ export default function LiveGamePage() {
           {quarterLabel(game.mprDeadlineQuarter ?? 4)}
         </p>
         <div className="stack">
+          <Link className="sheet-option" to={`/games/${game.id}/players`} data-testid="manage-players">
+            <span>
+              Manage players
+              <span className="sub">Injured, absent, late arrivals, exempt</span>
+            </span>
+            <span aria-hidden="true">›</span>
+          </Link>
           <Link className="sheet-option" to={`/games/${game.id}/history`}>
             Play history <span aria-hidden="true">›</span>
           </Link>
           <Link className="sheet-option" to={`/games/${game.id}/mpr`}>
-            MPR summary &amp; player statuses <span aria-hidden="true">›</span>
+            MPR summary <span aria-hidden="true">›</span>
           </Link>
           <Link className="sheet-option" to={`/games/${game.id}/quarters`}>
             Quarter breakdown <span aria-hidden="true">›</span>
@@ -649,5 +717,28 @@ export default function LiveGamePage() {
         </div>
       )}
     </div>
+  );
+}
+
+function GridIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true" focusable="false">
+      {[1, 8, 15].flatMap((y) =>
+        [1, 8, 15].map((x) => <rect key={`${x}-${y}`} x={x} y={y} width="6" height="6" rx="1.2" fill="currentColor" />),
+      )}
+    </svg>
+  );
+}
+
+function ListIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true" focusable="false">
+      {[3, 10, 17].map((y) => (
+        <g key={y}>
+          <rect x="1" y={y - 2} width="4" height="4" rx="1" fill="currentColor" />
+          <rect x="7" y={y - 1.5} width="14" height="3" rx="1.5" fill="currentColor" />
+        </g>
+      ))}
+    </svg>
   );
 }

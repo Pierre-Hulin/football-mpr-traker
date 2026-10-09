@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { EmptyState, Loading, NumberStepper, PageHeader, Switch, TextField } from "../components/ui";
 import { Modal } from "../components/Modal/Modal";
+import { PlayerStatusRow, StatusPickerSheet } from "../components/StatusPill/StatusPill";
 import { useToast } from "../components/Toast/ToastProvider";
 import { deleteDraftGame, updateDraftGame } from "../domain/commands/createGame";
 import { startGame } from "../domain/commands/startGame";
@@ -87,6 +88,7 @@ export default function GameSetupPage() {
   const [details, setDetails] = useState<{ opponent: string; gameDate: string } | null>(null);
   const [rules, setRules] = useState<RulesValue | null>(null);
   const [search, setSearch] = useState("");
+  const [picker, setPicker] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -127,6 +129,7 @@ export default function GameSetupPage() {
   if (data.game.status !== "draft") return <Navigate to={`/games/${gameId}/summary`} replace />;
 
   const teamName = data.team?.name ?? "Team";
+  const pickerRow = picker ? roster.find((r) => r.player.id === picker) : undefined;
   const counts = GAME_PLAYER_STATUSES.reduce(
     (acc, s) => ({ ...acc, [s]: roster.filter((r) => r.gp.status === s).length }),
     {} as Record<GamePlayerStatus, number>,
@@ -225,13 +228,23 @@ export default function GameSetupPage() {
       {step === "players" && (
         <div className="stack">
           <div className="row-between">
-            <span className="muted" style={{ fontWeight: 700 }}>
-              {counts.active} active · {roster.length - counts.active} not active
+            <span style={{ fontWeight: 700 }} data-testid="availability-summary">
+              {counts.active} of {roster.length} active
             </span>
-            <button type="button" className="btn btn-secondary btn-sm" onClick={() => void markAllActive()}>
-              Mark all active
-            </button>
+            {counts.active < roster.length && (
+              <button type="button" className="btn btn-secondary btn-sm" onClick={() => void markAllActive()}>
+                Reset all to Active
+              </button>
+            )}
           </div>
+          {counts.active < roster.length && (
+            <p className="muted small" style={{ margin: 0 }}>
+              {roster
+                .filter((r) => r.gp.status !== "active")
+                .map((r) => `#${r.player.jerseyNumber} ${GAME_PLAYER_STATUS_LABELS[r.gp.status]}`)
+                .join(" · ")}
+            </p>
+          )}
           {roster.length > 20 && (
             <input
               className="input"
@@ -258,37 +271,32 @@ export default function GameSetupPage() {
                     r.player.jerseyNumber === search.trim(),
                 )
                 .map((r) => (
-                  <li key={r.player.id} className="list-item" style={{ cursor: "default" }}>
-                    <span className="jersey" style={{ fontSize: "1.3rem" }}>
-                      #{r.player.jerseyNumber}
-                    </span>
-                    <span className="grow list-item-title" style={{ color: r.gp.status === "active" ? undefined : "var(--text-muted)" }}>
-                      {r.player.displayName}
-                    </span>
-                    <select
-                      className="select status-select"
-                      style={{ width: "auto" }}
-                      aria-label={`Status for #${r.player.jerseyNumber} ${r.player.displayName}`}
-                      value={r.gp.status}
-                      onChange={(e) => void setStatus(r.player.id, e.target.value as GamePlayerStatus)}
-                    >
-                      {GAME_PLAYER_STATUSES.map((s) => (
-                        <option key={s} value={s}>
-                          {GAME_PLAYER_STATUS_LABELS[s].toUpperCase()}
-                        </option>
-                      ))}
-                    </select>
-                  </li>
+                  <PlayerStatusRow
+                    key={r.player.id}
+                    jersey={r.player.jerseyNumber}
+                    name={r.player.displayName}
+                    status={r.gp.status}
+                    onOpen={() => setPicker(r.player.id)}
+                  />
                 ))}
             </ul>
           )}
           <p className="muted small">
-            Late players can be activated during the game. Injured, exempt and ineligible players stay on the record but are
-            excluded from MPR.
+            Everyone starts Active — tap a player only to mark an exception. Late players can be activated during the
+            game.
           </p>
           <button type="button" className="btn btn-primary btn-lg btn-block" onClick={() => setStep("review")} data-testid="review-game">
             REVIEW GAME
           </button>
+          <StatusPickerSheet
+            title={pickerRow ? `#${pickerRow.player.jerseyNumber} ${pickerRow.player.displayName}` : null}
+            current={pickerRow?.gp.status ?? "active"}
+            onClose={() => setPicker(null)}
+            onSelect={(status) => {
+              if (pickerRow) void setStatus(pickerRow.player.id, status);
+              setPicker(null);
+            }}
+          />
         </div>
       )}
 

@@ -41,7 +41,7 @@ export async function completeGame(gameId: string): Promise<{ game: Game; unmet:
         .filter((u) => u.short > 0);
 
       const now = nowIso();
-      const updated = await touchGame(game, { status: "completed", completedAt: now });
+      const updated = await touchGame(game, { status: "completed", completedAt: now, clearedLineup: undefined });
       await addEvent(game, {
         type: "game_completed",
         entityType: "game",
@@ -62,7 +62,7 @@ export async function completeGame(gameId: string): Promise<{ game: Game; unmet:
 export async function abandonGame(gameId: string, reason?: string): Promise<Game> {
   return writeTx([db.games, db.gameEvents, db.appSettings], async () => {
     const game = await requireActiveGame(gameId);
-    const updated = await touchGame(game, { status: "abandoned", completedAt: nowIso() });
+    const updated = await touchGame(game, { status: "abandoned", completedAt: nowIso(), clearedLineup: undefined });
     await addEvent(game, {
       type: "game_abandoned",
       entityType: "game",

@@ -59,18 +59,57 @@ async function replaceLineupInTx(gameId: string, playerIds: string[]) {
   return { selected, skipped };
 }
 
-export async function clearCurrentLineup(gameId: string): Promise<void> {
-  await writeTx([db.games, db.currentLineupMembers, db.gameEvents], async () => {
+/**
+ * Clear the lineup. A non-empty lineup is first saved on the game as a
+ * restorable snapshot (see restoreClearedLineup). Clearing an already-empty
+ * lineup leaves any existing snapshot untouched.
+ */
+export async function clearCurrentLineup(gameId: string): Promise<{ clearedCount: number }> {
+  return writeTx([db.games, db.currentLineupMembers, db.gameEvents], async () => {
     const game = await requireActiveGame(gameId);
     const before = await gameRepository.listLineup(gameId);
+    if (before.length === 0) return { clearedCount: 0 };
+    const playerIds = before.map((m) => m.playerId);
+    const now = nowIso();
     await gameRepository.clearLineup(gameId);
-    if (before.length > 0) {
-      await addEvent(game, {
-        type: "lineup_cleared",
-        entityType: "lineup",
-        before: { playerIds: before.map((m) => m.playerId) },
-      });
-    }
+    await gameRepository.update(gameId, {
+      clearedLineup: { playerIds, clearedAt: now, beforePlayNumber: game.nextPlayNumber },
+      updatedAt: now,
+    });
+    await addEvent(game, {
+      type: "lineup_cleared",
+      entityType: "lineup",
+      before: { playerIds },
+      createdAt: now,
+    });
+    return { clearedCount: playerIds.length };
+  });
+}
+
+export interface RestoreLineupResult {
+  selectedCount: number;
+  /** Snapshot players who are no longer available (injured, absent…) and were not restored. */
+  skippedCount: number;
+}
+
+/**
+ * Replace the current lineup with the exact lineup captured by the last Clear,
+ * then discard the snapshot. Players who have since become unavailable are skipped.
+ */
+export async function restoreClearedLineup(gameId: string): Promise<RestoreLineupResult> {
+  return writeTx([db.games, db.gamePlayers, db.currentLineupMembers, db.gameEvents], async () => {
+    const game = await requireActiveGame(gameId);
+    const snapshot = game.clearedLineup;
+    if (!snapshot) throw new DomainError("NO_LINEUP_TO_RESTORE");
+    const { selected, skipped } = await replaceLineupInTx(gameId, snapshot.playerIds);
+    await gameRepository.update(gameId, { clearedLineup: undefined, updatedAt: nowIso() });
+    await addEvent(game, {
+      type: "lineup_restored",
+      entityType: "lineup",
+      after: { playerIds: selected },
+      metadata: { clearedAt: snapshot.clearedAt, skippedPlayerIds: skipped },
+    });
+    return { selectedCount: selected.length, skippedCount: skipped.length };
   });
 }
 
@@ -93,6 +132,8 @@ export async function applyLineupPreset(gameId: string, presetId: string): Promi
         gameId,
         members.map((m) => m.playerId),
       );
+      // Loading a preset is a deliberate new lineup: the pre-Clear snapshot is stale.
+      if (game.clearedLineup) await gameRepository.update(gameId, { clearedLineup: undefined });
       await addEvent(game, {
         type: "lineup_preset_applied",
         entityType: "lineup",

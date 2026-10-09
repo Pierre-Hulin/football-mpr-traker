@@ -407,3 +407,178 @@ body.is-live {
     width: 110px;
   }
 }
+
+/* ---------- Lineup action bar: scrolling presets + fixed Clear / view toggle ---------- */
+
+.preset-bar {
+  align-items: center;
+  overflow: visible;
+}
+.preset-scroll {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  gap: var(--space-2);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.preset-scroll::-webkit-scrollbar {
+  display: none;
+}
+.preset-fixed {
+  flex: none;
+  display: flex;
+  gap: var(--space-2);
+}
+.preset-btn.clear {
+  margin-left: 0;
+}
+.preset-btn.restore {
+  border-color: var(--warn);
+  background: var(--warn-bg);
+  color: var(--warn);
+  white-space: nowrap;
+}
+.view-toggle {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  min-width: var(--tap);
+  min-height: var(--tap);
+  padding: 2px 6px;
+  border-radius: var(--radius);
+  border: 2px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+}
+
+/* ---------- Grid ("bingo card") view ---------- */
+
+.roster-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  /* 4 columns at 320px, 5 at 375–390px, 6 at 430px; never below a 60px tap target. */
+  grid-template-columns: repeat(auto-fill, minmax(62px, 1fr));
+  gap: 6px;
+}
+.ptile-cell {
+  scroll-margin: 80px;
+}
+.ptile {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  min-height: 60px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  border-radius: var(--radius);
+  border: 2px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  touch-action: manipulation;
+  user-select: none;
+}
+.ptile .pt-num {
+  font-size: 1.65rem;
+  font-weight: 900;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.ptile .pt-meta {
+  margin-top: 3px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+.ptile.in {
+  background: var(--in-bg);
+  border-color: var(--in-bg);
+  color: var(--in-text);
+}
+.ptile.in .pt-meta {
+  color: rgba(255, 255, 255, 0.88);
+}
+.ptile .pt-in {
+  position: absolute;
+  top: 2px;
+  left: 5px;
+  font-size: 0.8rem;
+  font-weight: 900;
+}
+.ptile.risk-at_risk {
+  border-color: var(--warn);
+  border-width: 3px;
+}
+.ptile.risk-critical {
+  border-color: var(--danger);
+  border-width: 4px;
+}
+.ptile.in.risk-at_risk {
+  box-shadow: inset 0 0 0 2px #ffc21a;
+}
+.ptile.in.risk-critical {
+  box-shadow: inset 0 0 0 2px #fff;
+}
+.ptile .pt-flag {
+  position: absolute;
+  top: -1px;
+  right: -1px;
+  min-width: 20px;
+  height: 20px;
+  border-radius: 0 var(--radius-sm) 0 var(--radius-sm);
+  font-size: 0.75rem;
+  font-weight: 900;
+  line-height: 20px;
+  text-align: center;
+}
+.ptile .pt-flag.critical {
+  background: var(--danger);
+  color: #fff;
+}
+.ptile .pt-flag.at_risk {
+  background: #ffc21a;
+  color: #1a1200;
+}
+.ptile.unavailable {
+  background: repeating-linear-gradient(135deg, var(--surface-2), var(--surface-2) 6px, var(--muted-bg) 6px, var(--muted-bg) 12px);
+  border-style: dashed;
+  border-color: var(--border-strong);
+  color: var(--text-muted);
+}
+.ptile.unavailable .pt-num {
+  opacity: 0.6;
+}
+.ptile.unavailable .pt-meta,
+.ptile.late .pt-meta {
+  color: var(--text);
+  letter-spacing: 0.03em;
+}
+.ptile.late {
+  border-style: dashed;
+  border-color: var(--warn);
+  background: var(--warn-bg);
+}
+.ptile.flash {
+  animation: flash 1.2s ease-out;
+}
+.grid-hint {
+  margin: var(--space-3) var(--space-1) 0;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  text-align: center;
+}

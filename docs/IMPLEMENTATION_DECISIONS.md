@@ -47,3 +47,38 @@ Deviations from `MPR-PRD.md`, `01_DATA_MODEL.md`, `02_SCREEN_FLOW.md` and `03_IM
 
 ## 11. AppSettings field
 - Added `defaultExpectedPlayersOnField` to `AppSettings`. It backs the Settings screen item "Default expected players on field" (`02 §44`) and is used as the default for new teams.
+
+## 12. Pregame status selection: status pill + bottom sheet
+- **Original:** `02 §18` called for a status selector on each row. It was built as a native `<select>` per player.
+- **Choice:** Each row is one tappable button showing the jersey, the name and a status pill. Active, the default, is shown quietly. Exceptions get a filled, coloured pill and a tinted row. Tapping a row opens a bottom sheet with all six statuses and a one-line description of each; one tap applies the status and closes the sheet. "Reset all to Active" appears only when there are exceptions, and a one-line summary lists those exceptions.
+- **Rejected:** A horizontal swipe selector. It conflicts with vertical scrolling, is hard to discover, carries a high risk of accidental changes, and doesn't scale well to six options. Inline segmented buttons per row were also rejected: six options don't fit at 320px.
+- **Impact:** UI only. Pregame changes still go through `updateGamePlayerStatus`.
+
+## 13. Restore lineup after Clear
+- **Data:** `Game.clearedLineup?: { playerIds, clearedAt, beforePlayNumber }`. This field is optional and not indexed, so no Dexie version bump or migration is needed. Backup validation accepts it.
+- **Created:** By Clear, but only when the lineup is non-empty. Clearing an already-empty lineup keeps the existing snapshot, so a double tap can't wipe it.
+- **Offered:** As a `↺ RESTORE n` chip at the start of the lineup action bar, visible only while a snapshot exists. The Clear toast's UNDO uses the same command. Restoring replaces the current selection with exactly the snapshot, skipping any player who has since become unavailable, and is logged as a `lineup_restored` event.
+- **Retired when:**
+  - it is restored;
+  - a play is recorded (so the snapshot can never be older than the current snap);
+  - a preset is applied (that is a deliberate new lineup);
+  - the game is completed or abandoned.
+- **Kept through:** Manual toggles, quarter changes, navigation, backgrounding and reload. The common accident is "cleared, then started tapping, then noticed", and the snapshot is still from the same snap.
+- **Known limit:** A second Clear of a non-empty lineup replaces the snapshot. Restore always means "the lineup immediately before the most recent Clear".
+
+## 14. Grid ("bingo card") live view
+- **Choice:** The grid is a responsive `auto-fill` grid with 62px minimum tiles: 4 columns at 320px, 5 at 375–390px and 6 at 430px. Each tile shows:
+  - the jersey number, as the dominant element;
+  - the plays/required count;
+  - IN as a solid fill plus a ✓;
+  - risk as a coloured border plus a corner `!` or `⚠`;
+  - unavailable players as a dashed, hatched tile with a short status (ABS, INJ, EXMPT, INEL), and late players as a dashed amber tile with LATE.
+
+  Names appear only in the tile's accessible name. Tapping an available tile toggles IN/OUT. Tapping a late or unavailable tile opens the player sheet (activate or reactivate).
+- **Switch:** A small GRID/LIST button sits next to CLEAR. It is saved as `AppSettings.liveRosterView`, can also be set in Settings, and defaults to `list` for existing users.
+- **Impact:** Both views render the same persisted lineup and the same optimistic toggle queue, so switching views never changes lineup state.
+
+## 15. In-game roster management
+- **Choice:** A new **Manage players** page (`/games/:id/players`), first item in the game menu. Every game player is listed with their status pill, plays and an "IN now" marker. Tapping a player opens the existing audited player sheet, which explains each change's effect and takes an optional note.
+- **Also reachable from:** Tapping a player's name in List view, tapping a late or unavailable tile in Grid view, and the link under the grid.
+- **Impact:** Uses the existing `updateGamePlayerStatus` transitions (all audited, recorded plays never touched, unavailable players removed from the lineup automatically). Nothing is deleted from the game.

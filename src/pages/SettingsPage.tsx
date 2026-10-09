@@ -9,7 +9,7 @@ import { useInstallPrompt } from "../hooks/useInstallPrompt";
 import { useServiceWorkerState } from "../pwa/registerSW";
 import { APP_VERSION, buildBackupFile, clearAllData, previewBackup, replaceAllData, type BackupPreview } from "../domain/services/backupService";
 import { isWakeLockSupported } from "../domain/services/wakeLockService";
-import { PLAYER_SORTS, type PlayerSort } from "../domain/enums";
+import { LIVE_ROSTER_VIEWS, PLAYER_SORTS, type PlayerSort } from "../domain/enums";
 import { toUserMessage } from "../domain/errors";
 import { downloadFile, readFileAsText, shareOrDownload } from "../utils/fileDownload";
 
@@ -110,6 +110,24 @@ export default function SettingsPage() {
               ))}
             </div>
             <span className="hint">Jersey order is recommended — rows never move during play.</span>
+          </div>
+          <div className="field">
+            <span className="label" id="view-label">
+              Live game player layout
+            </span>
+            <div className="segmented" role="group" aria-labelledby="view-label">
+              {LIVE_ROSTER_VIEWS.map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  aria-pressed={settings.liveRosterView === v}
+                  onClick={() => void updateAppSettings({ liveRosterView: v })}
+                >
+                  {v === "grid" ? "Grid (numbers)" : "List (names)"}
+                </button>
+              ))}
+            </div>
+            <span className="hint">You can also switch with the GRID / LIST button during a game.</span>
           </div>
           <NumberStepper
             label="Default players on field (new teams)"
