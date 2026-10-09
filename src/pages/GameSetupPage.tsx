@@ -245,6 +245,9 @@ export default function GameSetupPage() {
                 .join(" · ")}
             </p>
           )}
+          <p className="muted small" style={{ margin: 0 }} id="scrub-hint">
+            Everyone starts Active. Slide a status sideways to change it, or tap it for the full list.
+          </p>
           {roster.length > 20 && (
             <input
               className="input"
@@ -277,14 +280,12 @@ export default function GameSetupPage() {
                     name={r.player.displayName}
                     status={r.gp.status}
                     onOpen={() => setPicker(r.player.id)}
+                    onChange={(status) => void setStatus(r.player.id, status)}
                   />
                 ))}
             </ul>
           )}
-          <p className="muted small">
-            Everyone starts Active — tap a player only to mark an exception. Late players can be activated during the
-            game.
-          </p>
+          <p className="muted small">Late players can be activated during the game.</p>
           <button type="button" className="btn btn-primary btn-lg btn-block" onClick={() => setStep("review")} data-testid="review-game">
             REVIEW GAME
           </button>

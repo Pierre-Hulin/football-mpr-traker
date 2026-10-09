@@ -48,11 +48,24 @@ Deviations from `MPR-PRD.md`, `01_DATA_MODEL.md`, `02_SCREEN_FLOW.md` and `03_IM
 ## 11. AppSettings field
 - Added `defaultExpectedPlayersOnField` to `AppSettings`. It backs the Settings screen item "Default expected players on field" (`02 §44`) and is used as the default for new teams.
 
-## 12. Pregame status selection: status pill + bottom sheet
-- **Original:** `02 §18` called for a status selector on each row. It was built as a native `<select>` per player.
-- **Choice:** Each row is one tappable button showing the jersey, the name and a status pill. Active, the default, is shown quietly. Exceptions get a filled, coloured pill and a tinted row. Tapping a row opens a bottom sheet with all six statuses and a one-line description of each; one tap applies the status and closes the sheet. "Reset all to Active" appears only when there are exceptions, and a one-line summary lists those exceptions.
-- **Rejected:** A horizontal swipe selector. It conflicts with vertical scrolling, is hard to discover, carries a high risk of accidental changes, and doesn't scale well to six options. Inline segmented buttons per row were also rejected: six options don't fit at 320px.
-- **Impact:** UI only. Pregame changes still go through `updateGamePlayerStatus`.
+## 12. Pregame status selection: detented scrubber + bottom-sheet fallback
+- **Original:** `02 §18` called for a status selector on each row. It was built first as a native `<select>`, then as a pill that opens a bottom sheet (two taps per change).
+- **Choice:** Each row has a horizontal, detented **status scrubber** (`src/components/StatusScrubber`). A single drag-and-release moves through ACTIVE → ABSENT → LATE → INJURED → EXEMPT → INELIGIBLE. It does not wrap: the ‹ or › arrow disappears at either end.
+  - **Tap** (no drag), or tapping the name, still opens the bottom-sheet picker, so first-time and accessible use don't depend on the gesture.
+  - **Arrow keys** step through the statuses for keyboard users.
+  - "Reset all to Active", the exception summary and search are unchanged.
+- **Gesture thresholds:**
+  - The control uses `touch-action: pan-y`, so the browser keeps ownership of vertical scrolling. A vertical pan fires `pointercancel`, which reverts any preview.
+  - **Horizontal mode engages** only after 10px of horizontal travel that is at least 1.5× the vertical travel, i.e. within about 34° of horizontal.
+  - **The gesture is abandoned for good** once the finger moves 10px vertically while the movement is mostly vertical.
+  - **Each detent** is 28px of finger travel (Active → Ineligible is about 150px), with 0.15-step hysteresis so a value doesn't flicker at a boundary.
+  - **Release commits** the previewed status; the click after a drag is suppressed so the sheet doesn't also open.
+- **Feedback:**
+  - Because the thumb covers the control, a floating preview above it shows the current status and the whole six-status track while dragging.
+  - The control scales up slightly and recolours live.
+  - Each detent triggers an 8ms `navigator.vibrate` where supported (Android). iOS Safari has no vibration API, so iOS gets visual feedback only.
+- **Scope:** The scrubber is used only before kickoff. During a game, status changes keep the confirming, audited player sheet on the Manage players page.
+- **Rejected:** A free-scrolling carousel (imprecise, no clear detents) and a whole-row swipe (conflicts with scrolling and with tapping the row).
 
 ## 13. Restore lineup after Clear
 - **Data:** `Game.clearedLineup?: { playerIds, clearedAt, beforePlayNumber }`. This field is optional and not indexed, so no Dexie version bump or migration is needed. Backup validation accepts it.

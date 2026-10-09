@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { GAME_PLAYER_STATUSES, GAME_PLAYER_STATUS_LABELS, type GamePlayerStatus } from "../../domain/enums";
 import { Modal } from "../Modal/Modal";
+import { StatusScrubber } from "../StatusScrubber/StatusScrubber";
 
 export const STATUS_DESCRIPTIONS: Record<GamePlayerStatus, string> = {
   active: "Plays and counts toward MPR",
@@ -21,8 +22,11 @@ export function StatusPill({ status }: { status: GamePlayerStatus }) {
 }
 
 /**
- * One tappable roster row: the whole row opens the status picker, giving a
- * large target while keeping each row a single line.
+ * One roster row with a status control.
+ * - With `onChange` (pregame): the name area taps open the picker, and the
+ *   status is a horizontal StatusScrubber (drag to change, tap for the picker).
+ * - Without it (in-game): the whole row is one button that opens `onOpen`,
+ *   where changes are confirmed and audited.
  */
 export function PlayerStatusRow({
   jersey,
@@ -30,13 +34,43 @@ export function PlayerStatusRow({
   status,
   detail,
   onOpen,
+  onChange,
 }: {
   jersey: string;
   name: string;
   status: GamePlayerStatus;
   detail?: ReactNode;
   onOpen: () => void;
+  onChange?: (status: GamePlayerStatus) => void;
 }) {
+  const nameBlock = (
+    <>
+      <span className="jersey" style={{ fontSize: "1.25rem" }}>
+        #{jersey}
+      </span>
+      <span className="grow" style={{ minWidth: 0 }}>
+        <span className="list-item-title status-row-name">{name}</span>
+        {detail && <span className="list-item-sub">{detail}</span>}
+      </span>
+    </>
+  );
+
+  if (onChange) {
+    return (
+      <li className={`status-row-split ${status === "active" ? "" : "is-exception"}`} data-testid="status-row" data-jersey={jersey}>
+        <button
+          type="button"
+          className="list-item status-row-main"
+          onClick={onOpen}
+          aria-label={`#${jersey} ${name}, ${GAME_PLAYER_STATUS_LABELS[status]}. Open status list`}
+        >
+          {nameBlock}
+        </button>
+        <StatusScrubber status={status} playerLabel={`#${jersey} ${name}`} onChange={onChange} onOpenPicker={onOpen} />
+      </li>
+    );
+  }
+
   return (
     <li>
       <button
@@ -47,15 +81,7 @@ export function PlayerStatusRow({
         data-testid="status-row"
         data-jersey={jersey}
       >
-        <span className="jersey" style={{ fontSize: "1.25rem" }}>
-          #{jersey}
-        </span>
-        <span className="grow">
-          <span className="list-item-title" style={{ display: "block" }}>
-            {name}
-          </span>
-          {detail && <span className="list-item-sub">{detail}</span>}
-        </span>
+        {nameBlock}
         <StatusPill status={status} />
         <span className="chev" aria-hidden="true">
           ›
