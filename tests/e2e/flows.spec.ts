@@ -102,7 +102,7 @@ test("E2E 8 — undo reverts counts and play number", async ({ page }) => {
   await record(page, 2);
   await record(page, 3);
   await expect(row(page, 1)).toContainText("2 / 8");
-  await page.getByTestId("toast").getByRole("button", { name: "UNDO" }).click();
+  await page.getByTestId("undo-last").click();
   await expect(page.getByTestId("next-play")).toHaveText("2");
   await expect(row(page, 1)).toContainText("1 / 8");
 });

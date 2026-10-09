@@ -95,3 +95,18 @@ Deviations from `MPR-PRD.md`, `01_DATA_MODEL.md`, `02_SCREEN_FLOW.md` and `03_IM
 - **Choice:** A new **Manage players** page (`/games/:id/players`), first item in the game menu. Every game player is listed with their status pill, plays and an "IN now" marker. Tapping a player opens the existing audited player sheet, which explains each change's effect and takes an optional note.
 - **Also reachable from:** Tapping a player's name in List view, tapping a late or unavailable tile in Grid view, and the link under the grid.
 - **Impact:** Uses the existing `updateGamePlayerStatus` transitions (all audited, recorded plays never touched, unavailable players removed from the lineup automatically). Nothing is deleted from the game.
+
+## 16. Live screen: All / Focus, red Record Play, status line, Undo chip
+- **All / Focus:** A segmented control sits in a fixed row above the roster, so it stays reachable even when Focus is empty. It applies to both Grid and List.
+  - **Focus shows** players in the next-play lineup, plus field-eligible players whose risk level is not `met` or `excluded`. This is `isFocusRelevant`, built only on the existing `fieldEligible` and `risk` values.
+  - **Pure presentation:** jersey order is kept, and counts are derived live.
+  - **Persistence:** the choice is kept in `sessionStorage` per game, so it survives navigating to Manage players and back. A newly opened game starts in All.
+  - **Deviation — sticky tiles:** A player taken OUT while Focus is showing stays visible, shown as OUT, until the next recorded play or a mode switch. If they vanished immediately, every later tile would shift under the user's finger mid-substitution and the next tap could hit the wrong player. It also lets a mis-tap be undone in place. Unavailable players are never kept this way.
+- **Record Play:** The button is now #D32F2F with a white label (4.98:1 contrast). Hover is #C62828 and pressed/processing is #B71C1C. Red is used only for this action; the critical-risk crimson (#A3001B) and the selection blue are unchanged.
+  - **States:** `RECORDING…` (aria-busy), then `✓ PLAY n RECORDED` on a dark green background for about 1s, or `✕ NOT SAVED` on slate, alongside the existing blocking "Play was NOT saved / TRY AGAIN" dialog.
+  - **No optimistic counters:** totals change only after the database transaction commits.
+- **Duplicate protection:** In-flight taps are ignored, as before. Taps within 400ms of a successful record are also ignored as accidental double taps; the button is `aria-disabled` during that window. A legitimate next play is never closer than that, and nothing else is delayed.
+- **Lineup warning:** Moved out of the button into an amber line above it, shown only when the count is off ("⚠ 10 of 11 players selected"). Wrong-count confirmation is unchanged.
+- **Status line:** Line 1 is "n on field" (the next-play lineup). Line 2 is "need plays · met · unavailable", which partitions the roster and always sums to the All count. The two lines are kept visually separate because the lineup overlaps the roster categories.
+- **Undo:** The play-recorded toast was removed. The button's success state and the aria-live announcement replace it, and Undo moved to a persistent `↶ UNDO n` chip on the status line. The chip uses the same `undoLastPlay` command, and the "Play n undone · RESTORE" toast is kept. Toasts are positioned above the measured height of the record controls, so they never cover Record Play.
+- **Deviation — dark mode:** The app has no dark theme. PRD §32 makes it a light, high-contrast, sunlight-first UI, and building a whole dark theme was outside this change. The new colours were checked for contrast against both light and dark surfaces (`tests/unit/contrast.test.ts`).

@@ -172,3 +172,44 @@ export function countState(selected: number, expected: number): CountState {
   if (selected === expected) return "exact";
   return selected < expected ? "under" : "over";
 }
+
+// ---------- Live roster filtering & summary ----------
+
+export type RosterFilter = "all" | "focus";
+
+/**
+ * Focus mode: players on the field for the next play, plus available,
+ * MPR-eligible players who are still short of their minimum. Built only on
+ * the existing eligibility (`fieldEligible`) and risk (`risk.level`) values.
+ */
+export function isFocusRelevant(row: PlayerView, inLineup: boolean): boolean {
+  if (inLineup) return true;
+  return row.fieldEligible && row.risk.level !== "met" && row.risk.level !== "excluded";
+}
+
+/**
+ * Live status line. `onField` is the next-play lineup. `needPlays`, `met` and
+ * `unavailable` partition the roster (they always sum to `total`) and overlap
+ * with `onField`.
+ */
+export interface RosterSummary {
+  onField: number;
+  needPlays: number;
+  met: number;
+  unavailable: number;
+  total: number;
+}
+
+export function summarizeRoster(rows: PlayerView[], isIn: (playerId: string) => boolean): RosterSummary {
+  let onField = 0;
+  let needPlays = 0;
+  let met = 0;
+  let unavailable = 0;
+  for (const r of rows) {
+    if (r.fieldEligible && isIn(r.player.id)) onField++;
+    if (!r.fieldEligible) unavailable++;
+    else if (r.risk.level === "met") met++;
+    else needPlays++;
+  }
+  return { onField, needPlays, met, unavailable, total: rows.length };
+}

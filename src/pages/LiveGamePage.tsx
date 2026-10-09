@@ -8,7 +8,12 @@ import { useToast } from "../components/Toast/ToastProvider";
 import { EmptyState, Loading } from "../components/ui";
 import { PRESET_TYPE_LABELS, PRESET_TYPE_SHORT, quarterLabel, type GamePlayerStatus } from "../domain/enums";
 import { isDomainError, isStorageError, toUserMessage } from "../domain/errors";
-import { countState } from "../domain/selectors/getGameState";
+import {
+  countState,
+  isFocusRelevant,
+  summarizeRoster,
+  type RosterFilter,
+} from "../domain/selectors/getGameState";
 import { gameTitle } from "../domain/selectors/queries";
 import { recordPlay, type RecordPlayInput } from "../domain/commands/recordPlay";
 import { restorePlay, undoLastPlay } from "../domain/commands/undoLastPlay";
@@ -36,6 +41,27 @@ import { EndGameModal } from "./live/EndGameModal";
 interface Optimistic {
   value: boolean;
   pending: number;
+}
+
+/** Taps within this window after a successful record are treated as accidental double taps. */
+const DOUBLE_TAP_GUARD_MS = 400;
+const SUCCESS_FLASH_MS = 1000;
+const ERROR_FLASH_MS = 2000;
+
+const filterKey = (gameId?: string) => `mpr-live-filter:${gameId ?? ""}`;
+function readFilter(gameId?: string): RosterFilter {
+  try {
+    return sessionStorage.getItem(filterKey(gameId)) === "focus" ? "focus" : "all";
+  } catch {
+    return "all";
+  }
+}
+function writeFilter(gameId: string | undefined, filter: RosterFilter) {
+  try {
+    sessionStorage.setItem(filterKey(gameId), filter);
+  } catch {
+    // Storage unavailable: the choice just won't survive navigation.
+  }
 }
 
 type RecordRequest = Omit<RecordPlayInput, "gameId" | "confirmWrongPlayerCount">;
@@ -67,6 +93,20 @@ export default function LiveGamePage() {
   const [busy, setBusy] = useState(false);
   const [flashId, setFlashId] = useState<string | null>(null);
   const recordingRef = useRef(false);
+  /** Ignore record taps for a moment after a success: absorbs accidental double taps. */
+  const lastRecordedAt = useRef(0);
+  const [recordState, setRecordState] = useState<
+    { kind: "idle" } | { kind: "processing" } | { kind: "success"; playNumber: number } | { kind: "error" }
+  >({ kind: "idle" });
+  const [guarded, setGuarded] = useState(false);
+  const [filter, setFilterState] = useState<RosterFilter>(() => readFilter(gameId));
+  /**
+   * Players taken OUT while in Focus mode stay visible until the next recorded
+   * play (or a mode change), so tiles never shift under the user's finger and a
+   * mis-tap can be undone in place.
+   */
+  const [sticky, setSticky] = useState<Set<string>>(new Set());
+  const footerRef = useRef<HTMLElement>(null);
 
   const isActive = view?.game.status === "active";
   const { conflict, takeOver } = useGameLock(gameId, !!isActive);
@@ -77,8 +117,29 @@ export default function LiveGamePage() {
 
   useEffect(() => {
     document.body.classList.add("is-live");
-    return () => document.body.classList.remove("is-live");
+    return () => {
+      document.body.classList.remove("is-live");
+      document.body.style.removeProperty("--toast-offset");
+    };
   }, []);
+
+  // Keep toasts above the (variable-height) record controls.
+  useEffect(() => {
+    const el = footerRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => document.body.style.setProperty("--toast-offset", `${el.offsetHeight + 8}px`));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [view?.game.id]);
+
+  const setFilter = useCallback(
+    (next: RosterFilter) => {
+      setFilterState(next);
+      setSticky(new Set());
+      writeFilter(gameId, next);
+    },
+    [gameId],
+  );
 
   // Serialize every write so Record always sees prior lineup changes.
   const queue = useRef<Promise<unknown>>(Promise.resolve());
@@ -125,6 +186,7 @@ export default function LiveGamePage() {
     (playerId: string) => {
       if (!gameId) return;
       const next = !isIn(playerId);
+      if (!next && filter === "focus") setSticky((st) => new Set(st).add(playerId));
       setOptimistic((m) => new Map(m).set(playerId, { value: next, pending: (m.get(playerId)?.pending ?? 0) + 1 }));
       enqueue(() => togglePlayerInLineup(gameId, playerId, next))
         .then(() =>
@@ -143,47 +205,57 @@ export default function LiveGamePage() {
           reportError(err);
         });
     },
-    [gameId, isIn, enqueue, reportError],
+    [gameId, isIn, enqueue, reportError, filter],
   );
+
+  const onUndo = useCallback(() => {
+    if (!gameId) return;
+    enqueue(() => undoLastPlay(gameId))
+      .then((undone) => {
+        vibrate(20);
+        toast.show({
+          message: `Play ${undone.playNumber} undone`,
+          actionLabel: "RESTORE",
+          duration: 6000,
+          onAction: () =>
+            enqueue(() => restorePlay(undone.id))
+              .then(() => toast.show({ message: `Play ${undone.playNumber} restored` }))
+              .catch(reportError),
+        });
+      })
+      .catch(reportError);
+  }, [gameId, enqueue, toast, reportError]);
 
   const doRecord = useCallback(
     async (req: RecordRequest, confirmWrongPlayerCount: boolean) => {
       if (!gameId || recordingRef.current) return;
+      if (Date.now() - lastRecordedAt.current < DOUBLE_TAP_GUARD_MS) return;
       recordingRef.current = true;
+      setRecordState({ kind: "processing" });
       try {
         const { play } = await enqueue(() => recordPlay({ gameId, ...req, confirmWrongPlayerCount }));
+        lastRecordedAt.current = Date.now();
         setSaveFailure(null);
+        setSticky(new Set());
         vibrate(35);
-        const counts = play.countsForMpr ? "" : " · does not count";
-        toast.show({
-          message: `✓ Play ${play.playNumber} recorded${counts}`,
-          actionLabel: "UNDO",
-          duration: 7000,
-          onAction: () => {
-            enqueue(() => undoLastPlay(gameId))
-              .then((undone) => {
-                vibrate(20);
-                toast.show({
-                  message: `Play ${undone.playNumber} undone`,
-                  actionLabel: "RESTORE",
-                  duration: 6000,
-                  onAction: () =>
-                    enqueue(() => restorePlay(undone.id))
-                      .then(() => toast.show({ message: `Play ${undone.playNumber} restored` }))
-                      .catch(reportError),
-                });
-              })
-              .catch(reportError);
-          },
-        });
+        setRecordState({ kind: "success", playNumber: play.playNumber });
+        setGuarded(true);
+        window.setTimeout(() => setGuarded(false), DOUBLE_TAP_GUARD_MS);
+        window.setTimeout(
+          () => setRecordState((st) => (st.kind === "success" && st.playNumber === play.playNumber ? { kind: "idle" } : st)),
+          SUCCESS_FLASH_MS,
+        );
+        toast.announce(`Play ${play.playNumber} recorded${play.countsForMpr ? "" : ", does not count"}`);
       } catch (err) {
         if (isDomainError(err, "PLAYER_COUNT_CONFIRMATION_REQUIRED")) {
+          setRecordState({ kind: "idle" });
           const d = err.details as { selected: number; expected: number };
           setCountConfirm({ req, selected: d.selected, expected: d.expected });
-        } else if (isStorageError(err)) {
-          setSaveFailure({ req, confirm: confirmWrongPlayerCount, message: toUserMessage(err) });
         } else {
-          reportError(err);
+          setRecordState({ kind: "error" });
+          window.setTimeout(() => setRecordState((st) => (st.kind === "error" ? { kind: "idle" } : st)), ERROR_FLASH_MS);
+          if (isStorageError(err)) setSaveFailure({ req, confirm: confirmWrongPlayerCount, message: toUserMessage(err) });
+          else reportError(err);
         }
       } finally {
         recordingRef.current = false;
@@ -349,6 +421,11 @@ export default function LiveGamePage() {
   const sheetView = sheetPlayerId ? view.rowsById.get(sheetPlayerId) : undefined;
   const countIcon = cs === "exact" ? "✓ " : cs === "under" ? "▼ " : "▲ ";
   const isGrid = settings.liveRosterView === "grid";
+  const inOf = (r: (typeof view.rows)[number]) => r.fieldEligible && isIn(r.player.id);
+  const focusRows = view.rows.filter((r) => isFocusRelevant(r, inOf(r)) || (sticky.has(r.player.id) && r.fieldEligible));
+  const visibleRows = filter === "focus" ? focusRows : view.rows;
+  const summary = summarizeRoster(view.rows, isIn);
+  const processing = recordState.kind === "processing";
   const restoreCount = game.clearedLineup?.playerIds.length ?? 0;
 
   return (
@@ -465,10 +542,33 @@ export default function LiveGamePage() {
         </div>
       </nav>
 
+      <div className="roster-filter" role="radiogroup" aria-label="Show players">
+        <button
+          type="button"
+          role="radio"
+          aria-checked={filter === "all"}
+          onClick={() => setFilter("all")}
+          data-testid="filter-all"
+          aria-label={`All: ${view.rows.length} players`}
+        >
+          All <span className="rf-count">({view.rows.length})</span>
+        </button>
+        <button
+          type="button"
+          role="radio"
+          aria-checked={filter === "focus"}
+          onClick={() => setFilter("focus")}
+          data-testid="filter-focus"
+          aria-label={`Focus: ${focusRows.length} players on the field or still needing plays`}
+        >
+          Focus <span className="rf-count">({focusRows.length})</span>
+        </button>
+      </div>
+
       <main className={`roster ${isGrid ? "is-grid" : ""}`} aria-label="Players">
         {isGrid ? (
           <ul className="roster-grid" data-testid="roster-grid">
-            {view.rows.map((row) => (
+            {visibleRows.map((row) => (
               <PlayerTile
                 key={row.player.id}
                 view={row}
@@ -481,7 +581,7 @@ export default function LiveGamePage() {
           </ul>
         ) : (
           <ul className="roster-list" data-testid="roster-list">
-            {view.rows.map((row) => (
+            {visibleRows.map((row) => (
               <PlayerRow
                 key={row.player.id}
                 view={row}
@@ -495,6 +595,15 @@ export default function LiveGamePage() {
           </ul>
         )}
         {view.rows.length === 0 && <EmptyState title="No players in this game" />}
+        {view.rows.length > 0 && visibleRows.length === 0 && (
+          <div className="empty" data-testid="focus-empty">
+            <div className="empty-title">No players need attention</div>
+            <p>Nobody is on the field and every available player has met their minimum.</p>
+            <button type="button" className="btn btn-secondary" onClick={() => setFilter("all")}>
+              Show all players
+            </button>
+          </div>
+        )}
         {isGrid && view.rows.length > 0 && (
           <p className="grid-hint">
             Tap a number for IN/OUT. Names, injuries and late arrivals: <Link to={`/games/${game.id}/players`}>Manage players</Link>
@@ -502,31 +611,81 @@ export default function LiveGamePage() {
         )}
       </main>
 
-      <footer className="record-bar">
-        <button
-          type="button"
-          className={`record-btn ${cs !== "exact" ? "mismatch" : ""}`}
-          onClick={onRecord}
-          data-testid="record"
-        >
-          RECORD PLAY
-          <span className="record-sub">
-            {selectedCount} {selectedCount === 1 ? "player" : "players"} selected
-            {cs !== "exact" ? ` · expected ${view.expected}` : ""}
-          </span>
-        </button>
-        <button
-          type="button"
-          className="record-more"
-          onClick={() => setRecordMenuOpen(true)}
-          aria-label="More record options: non-counting, special teams, PAT"
-          data-testid="record-more"
-        >
-          <span className="dots" aria-hidden="true">
-            ⋯
-          </span>
-          MORE
-        </button>
+      <footer className="record-bar" ref={footerRef}>
+        <div className="record-status">
+          <p
+            className="game-summary"
+            data-testid="game-summary"
+            aria-label={
+              `${summary.onField} on the field for the next play. Roster of ${summary.total}: ` +
+              `${summary.needPlays} still need plays, ${summary.met} met the minimum, ${summary.unavailable} unavailable.`
+            }
+          >
+            <span className="gs-field">
+              <b>{summary.onField}</b> on field
+            </span>
+            <span className="gs-roster">
+              <span>
+                <b>{summary.needPlays}</b> need plays
+              </span>
+              <span aria-hidden="true"> · </span>
+              <span>
+                <b>{summary.met}</b> met
+              </span>
+              <span aria-hidden="true"> · </span>
+              <span>
+                <b>{summary.unavailable}</b> unavailable
+              </span>
+            </span>
+          </p>
+          {view.lastPlay && (
+            <button
+              type="button"
+              className="undo-chip"
+              onClick={onUndo}
+              aria-label={`Undo play ${view.lastPlay.play.playNumber}`}
+              data-testid="undo-last"
+            >
+              ↶ UNDO {view.lastPlay.play.playNumber}
+            </button>
+          )}
+        </div>
+        {cs !== "exact" && (
+          <p className="lineup-warning" role="status" data-testid="lineup-warning">
+            <span aria-hidden="true">{cs === "under" ? "⚠" : "▲"}</span> {selectedCount} of {view.expected} players selected
+            {cs === "over" ? " (too many)" : ""}
+          </p>
+        )}
+        <div className="record-actions">
+          <button
+            type="button"
+            className={`record-btn state-${recordState.kind}`}
+            onClick={onRecord}
+            aria-disabled={processing || guarded}
+            aria-busy={processing}
+            data-testid="record"
+          >
+            {recordState.kind === "processing"
+              ? "RECORDING…"
+              : recordState.kind === "success"
+                ? `✓ PLAY ${recordState.playNumber} RECORDED`
+                : recordState.kind === "error"
+                  ? "✕ NOT SAVED"
+                  : "RECORD PLAY"}
+          </button>
+          <button
+            type="button"
+            className="record-more"
+            onClick={() => setRecordMenuOpen(true)}
+            aria-label="More record options: non-counting, special teams, PAT"
+            data-testid="record-more"
+          >
+            <span className="dots" aria-hidden="true">
+              ⋯
+            </span>
+            MORE
+          </button>
+        </div>
       </footer>
 
       {/* ---------- Sheets & modals ---------- */}

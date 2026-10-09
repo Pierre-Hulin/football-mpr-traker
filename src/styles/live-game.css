@@ -301,52 +301,138 @@
   cursor: pointer;
 }
 
+/* ---------- Record controls: status line, lineup warning, RECORD PLAY ---------- */
+
 .record-bar {
   flex: none;
   display: flex;
-  gap: var(--space-2);
-  padding: var(--space-2) calc(var(--space-2) + var(--safe-right)) calc(var(--space-2) + var(--safe-bottom))
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px calc(var(--space-2) + var(--safe-right)) calc(var(--space-2) + var(--safe-bottom))
     calc(var(--space-2) + var(--safe-left));
   background: var(--surface);
   border-top: 2px solid var(--border);
   box-shadow: 0 -4px 14px rgba(10, 15, 26, 0.08);
 }
+.record-status {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+}
+.game-summary {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 10px;
+  row-gap: 0;
+  font-size: 0.8rem;
+  line-height: 1.35;
+  color: var(--text-muted);
+}
+.game-summary b {
+  color: var(--text);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.game-summary {
+  flex-direction: column;
+  align-items: flex-start;
+}
+.game-summary .gs-field {
+  color: var(--text);
+  font-weight: 700;
+}
+.game-summary .gs-roster > span {
+  white-space: nowrap;
+}
+.undo-chip {
+  flex: none;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 2px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 800;
+  font-size: 0.8rem;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.undo-chip:active {
+  background: var(--surface-2);
+}
+.lineup-warning {
+  margin: 0;
+  padding: 6px 12px;
+  border-radius: var(--radius);
+  border: 2px solid var(--warn);
+  background: var(--warn-bg);
+  color: var(--warn);
+  font-weight: 800;
+  font-size: 0.9rem;
+  text-align: center;
+}
+.record-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+/* Red is reserved for the recording action on the live screen. */
 .record-btn {
+  --record: #d32f2f;
+  --record-hover: #c62828;
+  --record-pressed: #b71c1c;
   flex: 1;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 72px;
+  min-height: 68px;
+  padding: 0 var(--space-3);
   border-radius: var(--radius-lg);
   border: none;
-  background: var(--primary);
+  background: var(--record);
   color: #fff;
   font-weight: 900;
   font-size: 1.4rem;
   letter-spacing: 0.06em;
+  line-height: 1.1;
+  text-align: center;
   cursor: pointer;
   touch-action: manipulation;
+  transition: background 0.1s ease-out, transform 0.06s ease-out;
 }
-.record-btn:active {
-  background: var(--primary-hover);
-  transform: scale(0.99);
+@media (hover: hover) {
+  .record-btn:hover {
+    background: var(--record-hover);
+  }
+}
+.record-btn:active,
+.record-btn.state-processing {
+  background: var(--record-pressed);
+  transform: scale(0.985);
+}
+.record-btn.state-processing {
+  cursor: progress;
+}
+.record-btn.state-success {
+  background: #1b6e34;
+  font-size: 1.1rem;
+  letter-spacing: 0.04em;
+}
+.record-btn.state-error {
+  background: #3d4757;
+  font-size: 1.1rem;
 }
 .record-btn:disabled {
-  opacity: 0.6;
-}
-.record-btn .record-sub {
-  font-size: 0.8rem;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  opacity: 0.9;
-}
-.record-btn.mismatch .record-sub {
-  background: #ffc21a;
-  color: #1a1200;
-  border-radius: 999px;
-  padding: 0 8px;
-  margin-top: 2px;
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 .record-more {
   flex: none;
@@ -369,11 +455,59 @@
   line-height: 1;
 }
 
-body.is-live .toast-region {
-  --toast-offset: 100px;
-}
 body.is-live {
   overflow: hidden;
+}
+
+/* ---------- All / Focus filter ---------- */
+
+.roster-filter {
+  flex: none;
+  display: flex;
+  margin: 6px calc(var(--space-2) + var(--safe-right)) 0 calc(var(--space-2) + var(--safe-left));
+  border: 2px solid var(--border-strong);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--surface);
+}
+.roster-filter button {
+  flex: 1;
+  min-height: 44px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-weight: 800;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+.roster-filter button + button {
+  border-left: 2px solid var(--border-strong);
+}
+.roster-filter button[aria-checked="true"] {
+  background: #1f2937;
+  color: #fff;
+}
+.roster-filter .rf-count {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  opacity: 0.85;
+}
+
+@media (max-width: 360px) {
+  .record-btn {
+    min-height: 62px;
+    font-size: 1.25rem;
+  }
+  .record-btn.state-success {
+    font-size: 0.95rem;
+  }
+  .game-summary {
+    font-size: 0.72rem;
+  }
+  .undo-chip {
+    padding: 0 8px;
+    font-size: 0.72rem;
+  }
 }
 
 .lock-overlay {
