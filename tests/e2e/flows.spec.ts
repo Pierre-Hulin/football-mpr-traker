@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { createTeamWithRoster, range, record, row, selectPlayers, startGame, toggle } from "./helpers";
+import { createTeamWithRoster, expectLineupSaved, range, record, row, selectPlayers, startGame, toggle } from "./helpers";
 
 test("E2E 1 — first game: create team, paste roster, record 3 plays", async ({ page }) => {
   await createTeamWithRoster(page);
@@ -21,6 +21,9 @@ test("E2E 2 — persistence: lineup survives reload", async ({ page }) => {
   await startGame(page);
   await selectPlayers(page, range(1, 11));
   await expect(page.getByTestId("selected-count")).toContainText("11/11");
+  // 11/11 appears on tap; reload only once the taps are committed (an earlier
+  // reload is what the beforeunload guard protects against).
+  await expectLineupSaved(page);
   await page.reload();
   await expect(page.getByTestId("selected-count")).toContainText("11/11");
   await expect(toggle(page, 5)).toHaveAttribute("aria-pressed", "true");

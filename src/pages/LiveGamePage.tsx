@@ -7,7 +7,7 @@ import { PlayerTile } from "../components/PlayerTile/PlayerTile";
 import { useToast } from "../components/Toast/ToastProvider";
 import { EmptyState, Loading } from "../components/ui";
 import { PRESET_TYPE_LABELS, PRESET_TYPE_SHORT, quarterLabel, type GamePlayerStatus } from "../domain/enums";
-import { isDomainError, isStorageError, toUserMessage } from "../domain/errors";
+import { DomainError, isDomainError, isStorageError, toUserMessage } from "../domain/errors";
 import {
   countState,
   isFocusRelevant,
@@ -24,7 +24,7 @@ import {
   applyLineupPreset,
   clearCurrentLineup,
   restoreClearedLineup,
-  togglePlayerInLineup,
+  setLineupMembership,
 } from "../domain/commands/setCurrentLineup";
 import { buildBackupFile } from "../domain/services/backupService";
 import { logGameExport } from "../domain/services/exportService";
@@ -92,8 +92,13 @@ export default function LiveGamePage() {
   const [saveFailure, setSaveFailure] = useState<{ req: RecordRequest; confirm: boolean; message: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [flashId, setFlashId] = useState<string | null>(null);
-  const recordingRef = useRef(false);
-  /** Ignore record taps for a moment after a success: absorbs accidental double taps. */
+  /** Records currently being saved (the main button ignores taps while any are). */
+  const recordingRef = useRef(0);
+  /**
+   * Ignore main-button taps for a moment after a success: absorbs accidental
+   * double taps. Deliberate multi-step paths (Record menu, dialogs) are not
+   * subject to it.
+   */
   const lastRecordedAt = useRef(0);
   const [recordState, setRecordState] = useState<
     { kind: "idle" } | { kind: "processing" } | { kind: "success"; playNumber: number } | { kind: "error" }
@@ -182,31 +187,72 @@ export default function LiveGamePage() {
     [toast],
   );
 
+  /**
+   * Lineup taps not yet handed to IndexedDB. Taps that arrive while earlier
+   * writes are still running are flushed together in ONE transaction instead of
+   * one transaction per tap, so persistence keeps pace with the optimistic UI
+   * however fast the coach taps. The flush is queued like every other write, so
+   * Record still sees every earlier tap.
+   */
+  const lineupBatch = useRef<Map<string, { value: boolean; taps: number }> | null>(null);
+
   const onToggle = useCallback(
     (playerId: string) => {
       if (!gameId) return;
       const next = !isIn(playerId);
       if (!next && filter === "focus") setSticky((st) => new Set(st).add(playerId));
       setOptimistic((m) => new Map(m).set(playerId, { value: next, pending: (m.get(playerId)?.pending ?? 0) + 1 }));
-      enqueue(() => togglePlayerInLineup(gameId, playerId, next))
-        .then(() =>
-          setOptimistic((m) => {
-            const o = m.get(playerId);
-            if (!o) return m;
-            return new Map(m).set(playerId, { ...o, pending: Math.max(o.pending - 1, 0) });
-          }),
-        )
-        .catch((err) => {
+
+      let batch = lineupBatch.current;
+      if (!batch) {
+        const pending = new Map<string, { value: boolean; taps: number }>();
+        batch = lineupBatch.current = pending;
+        const drop = (ids: Iterable<string>) =>
           setOptimistic((m) => {
             const n = new Map(m);
-            n.delete(playerId);
+            for (const id of ids) n.delete(id);
             return n;
           });
-          reportError(err);
-        });
+        enqueue(() => {
+          // From here on, new taps start the next batch.
+          if (lineupBatch.current === pending) lineupBatch.current = null;
+          return setLineupMembership(gameId, [...pending].map(([id, c]) => [id, c.value] as const));
+        })
+          .then(({ rejected }) => {
+            setOptimistic((m) => {
+              const n = new Map(m);
+              for (const [id, c] of pending) {
+                const o = n.get(id);
+                if (o) n.set(id, { ...o, pending: Math.max(o.pending - c.taps, 0) });
+              }
+              return n;
+            });
+            if (rejected.length > 0) {
+              drop(rejected);
+              reportError(new DomainError("PLAYER_NOT_AVAILABLE"));
+            }
+          })
+          .catch((err) => {
+            drop(pending.keys());
+            reportError(err);
+          });
+      }
+      batch.set(playerId, { value: next, taps: (batch.get(playerId)?.taps ?? 0) + 1 });
     },
     [gameId, isIn, enqueue, reportError, filter],
   );
+
+  /** False while a lineup tap is shown but not yet committed to IndexedDB. */
+  const lineupSaved = useMemo(() => ![...optimistic.values()].some((o) => o.pending > 0), [optimistic]);
+
+  // Closing or reloading in the instant between a tap and its commit would lose
+  // that tap: ask the browser to confirm in that (normally ~1 frame) window.
+  useEffect(() => {
+    if (lineupSaved) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [lineupSaved]);
 
   const onUndo = useCallback(() => {
     if (!gameId) return;
@@ -228,9 +274,8 @@ export default function LiveGamePage() {
 
   const doRecord = useCallback(
     async (req: RecordRequest, confirmWrongPlayerCount: boolean) => {
-      if (!gameId || recordingRef.current) return;
-      if (Date.now() - lastRecordedAt.current < DOUBLE_TAP_GUARD_MS) return;
-      recordingRef.current = true;
+      if (!gameId) return;
+      recordingRef.current++;
       setRecordState({ kind: "processing" });
       try {
         const { play } = await enqueue(() => recordPlay({ gameId, ...req, confirmWrongPlayerCount }));
@@ -258,13 +303,18 @@ export default function LiveGamePage() {
           else reportError(err);
         }
       } finally {
-        recordingRef.current = false;
+        recordingRef.current--;
       }
     },
     [gameId, enqueue, toast, reportError],
   );
 
-  const onRecord = () => doRecord({ countsForMpr: true, playCategory: "scrimmage" }, false);
+  const onRecord = () => {
+    // Double-tap absorption belongs to this one big button only: a second tap here
+    // within the guard window (or while a save is running) is never intended.
+    if (recordingRef.current > 0 || Date.now() - lastRecordedAt.current < DOUBLE_TAP_GUARD_MS) return;
+    void doRecord({ countsForMpr: true, playCategory: "scrimmage" }, false);
+  };
   const onRecordOption = (opts: RecordOptions) => doRecord(opts, false);
 
   const onPreset = (presetId: string) => {
@@ -452,7 +502,7 @@ export default function LiveGamePage() {
           role="status"
           aria-label={`${selectedCount} of ${view.expected} players on field${cs === "under" ? ", too few" : cs === "over" ? ", too many" : ""}`}
         >
-          <span className="hdr-count-num" data-testid="selected-count">
+          <span className="hdr-count-num" data-testid="selected-count" data-saved={lineupSaved}>
             {countIcon}
             {selectedCount}/{view.expected}
           </span>

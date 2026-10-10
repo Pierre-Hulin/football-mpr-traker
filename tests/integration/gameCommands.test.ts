@@ -14,6 +14,7 @@ import { updateGamePlayerStatus } from "../../src/domain/commands/updateGamePlay
 import {
   applyLineupPreset,
   clearCurrentLineup,
+  setLineupMembership,
   togglePlayerInLineup,
 } from "../../src/domain/commands/setCurrentLineup";
 import { createPreset } from "../../src/domain/commands/presets";
@@ -163,6 +164,37 @@ describe("lineup", () => {
     await clearCurrentLineup(game.id);
     expect((await view(game.id)).selectedCount).toBe(0);
     expect(await db.gameEvents.where("[gameId+type]").equals([game.id, "lineup_cleared"]).count()).toBe(1);
+  });
+
+  it("applies a batch of IN/OUT choices in one go; the last choice per player wins", async () => {
+    const { game, players } = await seedActiveGame();
+    const ids = players.map((p) => p.id);
+    const r = await setLineupMembership(game.id, [
+      ...ids.slice(0, 11).map((id) => [id, true] as const),
+      [ids[0], false],
+      [ids[11], true],
+      [ids[11], false],
+      [ids[12], true],
+    ]);
+    expect(r.rejected).toEqual([]);
+    const v = await view(game.id);
+    expect(v.selectedCount).toBe(11);
+    expect(v.rowsById.get(ids[0])?.inLineup).toBe(false);
+    expect(v.rowsById.get(ids[11])?.inLineup).toBe(false);
+    expect(v.rowsById.get(ids[12])?.inLineup).toBe(true);
+  });
+
+  it("skips unavailable players in a batch but still commits the rest", async () => {
+    const { game, players } = await seedActiveGame();
+    await updateGamePlayerStatus({ gameId: game.id, playerId: players[0].id, status: "absent" });
+    const r = await setLineupMembership(game.id, [
+      [players[0].id, true],
+      [players[1].id, true],
+    ]);
+    expect(r.rejected).toEqual([players[0].id]);
+    const v = await view(game.id);
+    expect(v.rowsById.get(players[0].id)?.inLineup).toBe(false);
+    expect(v.rowsById.get(players[1].id)?.inLineup).toBe(true);
   });
 
   it("refuses to put an unavailable player IN", async () => {

@@ -62,6 +62,34 @@ async function openAvailability(page: Page) {
 
 const scrollY = (page: Page) => page.evaluate(() => window.scrollY);
 
+/** Resolve once the page has stopped scrolling (touch flings keep going after release). */
+const scrollSettled = (page: Page) =>
+  page.evaluate(async () => {
+    const frame = () => new Promise((r) => requestAnimationFrame(r));
+    let last = window.scrollY;
+    let still = 0;
+    while (still < 6) {
+      await frame();
+      still = window.scrollY === last ? still + 1 : 0;
+      last = window.scrollY;
+    }
+    return last;
+  });
+
+/**
+ * Scroll so the scrubber's centre sits at `viewportY`, and report how far the
+ * page can still scroll in the direction a finger moving by `dy` would scroll it.
+ */
+async function placeScrubber(page: Page, jersey: number, viewportY: number, dy: number) {
+  await scrubber(page, jersey).evaluate((el, vy) => {
+    const r = el.getBoundingClientRect();
+    window.scrollTo({ top: window.scrollY + r.top + r.height / 2 - vy, behavior: "instant" });
+  }, viewportY);
+  const y = await scrollSettled(page);
+  const max = await page.evaluate(() => document.documentElement.scrollHeight - window.innerHeight);
+  return dy < 0 ? max - y : y; // finger up scrolls the page down, and vice versa
+}
+
 test.describe("status scrubber", () => {
   test("one drag-release changes Active → Injured, with live preview and snapping", async ({ page }) => {
     await openAvailability(page);
@@ -127,16 +155,25 @@ test.describe("status scrubber", () => {
   test("a mostly-vertical gesture starting on the status control scrolls and never changes status", async ({ page }) => {
     await openAvailability(page);
     const finger = await Finger.create(page);
+    const viewport = page.viewportSize()!;
     for (const [dx, dy] of [
       [0, -240],
       [25, -220], // imperfect, slightly diagonal thumb scroll
       [-30, -200],
       [40, 120],
     ]) {
+      // Each gesture starts from a known position with room to scroll in its
+      // direction. (Chaining them from wherever the previous fling stopped made
+      // the result depend on fling distance, which differs between platforms:
+      // on Linux CI the third gesture started at the bottom of the page.)
+      const room = await placeScrubber(page, 7, dy < 0 ? viewport.height - 100 : 100, dy);
+      expect(room, "page must be able to scroll in the gesture's direction").toBeGreaterThan(100);
       const p = await center(page, 7);
       const before = await scrollY(page);
       await finger.drag(p.x, p.y, dx, dy);
       await expect.poll(async () => Math.abs((await scrollY(page)) - before)).toBeGreaterThan(40);
+      await scrollSettled(page);
+      await expect(page.getByTestId("scrub-bubble")).toHaveCount(0);
       await expect(scrubber(page, 7)).toHaveAttribute("data-status", "active");
     }
     await expect(page.getByTestId("availability-summary")).toHaveText("14 of 14 active");

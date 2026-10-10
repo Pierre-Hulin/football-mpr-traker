@@ -41,7 +41,15 @@ export async function selectPlayers(page: Page, jerseys: number[]) {
   for (const j of jerseys) await toggle(page, j).click();
 }
 
-export const range = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, i) => from + i);
+/**
+ * The selected count is optimistic (it updates on tap); wait until every tap is
+ * committed to IndexedDB before doing anything that drops in-memory state.
+ */
+export async function expectLineupSaved(page: Page) {
+  await expect(page.getByTestId("selected-count")).toHaveAttribute("data-saved", "true");
+}
+
+export const range =(from: number, to: number) => Array.from({ length: to - from + 1 }, (_, i) => from + i);
 
 export async function record(page: Page, expectedNext: number) {
   await page.getByTestId("record").click();

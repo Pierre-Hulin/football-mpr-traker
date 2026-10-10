@@ -30,6 +30,39 @@ export async function togglePlayerInLineup(
   });
 }
 
+/**
+ * Apply several IN/OUT choices in ONE transaction (the live screen batches rapid
+ * taps through this so persistence keeps pace with the UI). The last choice for
+ * a player wins. Players who can't be put IN because they are unavailable are
+ * skipped and returned in `rejected`; the rest of the batch still commits.
+ */
+export async function setLineupMembership(
+  gameId: string,
+  changes: ReadonlyArray<readonly [playerId: string, selected: boolean]>,
+): Promise<{ rejected: string[] }> {
+  const desired = new Map(changes);
+  if (desired.size === 0) return { rejected: [] };
+  return writeTx([db.games, db.gamePlayers, db.currentLineupMembers], async () => {
+    await requireActiveGame(gameId);
+    const rejected: string[] = [];
+    for (const [playerId, selected] of desired) {
+      const id = lineupMemberId(gameId, playerId);
+      const existing = await db.currentLineupMembers.get(id);
+      if (selected) {
+        const gp = await gameRepository.getGamePlayer(gamePlayerId(gameId, playerId));
+        if (!gp || !isFieldEligible(gp.status)) {
+          rejected.push(playerId);
+          continue;
+        }
+        if (!existing) await gameRepository.putLineupMember({ id, gameId, playerId, selectedAt: nowIso() });
+      } else if (existing) {
+        await gameRepository.deleteLineupMember(id);
+      }
+    }
+    return { rejected };
+  });
+}
+
 /** Replace the lineup with the given players (unavailable players are skipped). */
 export async function replaceCurrentLineup(
   gameId: string,

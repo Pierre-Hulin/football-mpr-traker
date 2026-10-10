@@ -20,3 +20,11 @@ jobs:
       - run: npm run test:e2e
         env:
           CI: "true"
+      # Keep the retain-on-failure traces so CI-only failures can be inspected
+      # (npx playwright show-trace <trace.zip>).
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-traces
+          path: test-results/
+          retention-days: 14
