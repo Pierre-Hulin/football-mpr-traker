@@ -126,7 +126,7 @@ test.describe("All / Focus modes", () => {
 });
 
 test.describe("Record Play", () => {
-  test("red button, separate lineup warning, success feedback and status summary", async ({ page }) => {
+  test("red button, single lineup-count indicator, success feedback and status summary", async ({ page }) => {
     await createTeamWithRoster(page);
     await startGame(page, { requiredPlays: 2 });
     const record = page.getByTestId("record");
@@ -135,24 +135,35 @@ test.describe("Record Play", () => {
     expect(await record.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe("rgb(211, 47, 47)");
     expect(await record.evaluate((el) => getComputedStyle(el).color)).toBe("rgb(255, 255, 255)");
 
-    // Warning lives outside the button, only while the count is wrong.
-    await expect(page.getByTestId("lineup-warning")).toHaveText("⚠ 0 of 11 players selected");
+    // The header badge is the single lineup-count indicator; no duplicate warning by the button.
+    const badge = page.locator(".hdr-count");
+    await expect(badge).toContainText("0/11");
+    await expect(badge).toContainText(/too few/i);
+    await expect(badge).toHaveClass(/under/);
+    await expect(page.getByTestId("lineup-warning")).toHaveCount(0);
     await page.locator('[data-testid=player-row] [data-testid=toggle]').first().click();
     for (const j of range(2, 10)) await page.locator(`[data-testid=player-row][data-jersey="${j}"] [data-testid=toggle]`).click();
-    await expect(page.getByTestId("lineup-warning")).toHaveText("⚠ 10 of 11 players selected");
-    await expect(record).not.toContainText("selected");
-    const warnBox = (await page.getByTestId("lineup-warning").boundingBox())!;
-    const recBox = (await record.boundingBox())!;
-    expect(warnBox.y + warnBox.height).toBeLessThanOrEqual(recBox.y);
+    await expect(badge).toContainText("10/11");
+    await expect(badge).toHaveAttribute("aria-label", "10 of 11 players on field, too few");
+    await expect(record).toHaveText("RECORD PLAY");
 
     // Existing validation unchanged: wrong count still asks for confirmation.
     await record.click();
     await expect(page.getByRole("alertdialog")).toContainText("Record play with 10 players?");
     await page.getByRole("button", { name: "Cancel" }).click();
     await page.locator('[data-testid=player-row][data-jersey="11"] [data-testid=toggle]').click();
-    await expect(page.getByTestId("lineup-warning")).toHaveCount(0);
+    await expect(badge).toContainText("11/11");
+    await expect(badge).toContainText(/on field/i);
+    await expect(badge).toHaveClass(/exact/);
+    // Over-selection is flagged the same way; deselect back to 11.
+    await page.locator('[data-testid=player-row][data-jersey="12"] [data-testid=toggle]').click();
+    await expect(badge).toContainText("12/11");
+    await expect(badge).toContainText(/too many/i);
+    await page.locator('[data-testid=player-row][data-jersey="12"] [data-testid=toggle]').click();
+    await expect(badge).toContainText("11/11");
 
-    await expect(page.getByTestId("game-summary")).toContainText("11 on field");
+    // The bottom summary carries MPR stats only (no duplicate "on field").
+    await expect(page.getByTestId("game-summary")).not.toContainText("on field");
     await expect(page.getByTestId("game-summary")).toContainText("14 need plays");
     await record.click();
     await expect(record).toHaveText("✓ PLAY 1 RECORDED");
@@ -245,24 +256,24 @@ test.describe("Record Play", () => {
     await startGame(page);
     await toGrid(page);
     for (const j of range(1, 10)) await tile(page, j).click();
-    await expect(page.getByTestId("lineup-warning")).toBeVisible();
+    await expect(page.locator(".hdr-count")).toContainText("10/11");
 
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow).toBeLessThanOrEqual(0);
-    for (const id of ["record", "record-more", "filter-all", "filter-focus", "game-summary", "lineup-warning"]) {
+    for (const id of ["record", "record-more", "filter-all", "filter-focus", "game-summary", "clear-lineup", "view-toggle"]) {
       const box = (await page.getByTestId(id).boundingBox())!;
       expect(box.x).toBeGreaterThanOrEqual(0);
       expect(box.x + box.width).toBeLessThanOrEqual(320);
       expect(box.y + box.height).toBeLessThanOrEqual(568);
     }
-    for (const id of ["record", "filter-all", "filter-focus"]) {
+    for (const id of ["record", "filter-all", "filter-focus", "clear-lineup", "view-toggle"]) {
       const box = (await page.getByTestId(id).boundingBox())!;
       expect(box.height).toBeGreaterThanOrEqual(44);
       expect(box.width).toBeGreaterThanOrEqual(44);
     }
 
     // A toast (e.g. after Clear) sits above the whole control block.
-    await page.getByRole("button", { name: /Clear lineup/ }).click();
+    await page.getByRole("button", { name: /Clear field selection/ }).click();
     await expect(page.getByTestId("toast")).toBeVisible();
     await page.waitForTimeout(300); // let the slide-in animation finish
     const toast = (await page.getByTestId("toast").boundingBox())!;

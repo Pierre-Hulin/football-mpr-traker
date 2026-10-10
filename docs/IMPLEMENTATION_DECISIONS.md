@@ -110,3 +110,21 @@ Deviations from `MPR-PRD.md`, `01_DATA_MODEL.md`, `02_SCREEN_FLOW.md` and `03_IM
 - **Status line:** Line 1 is "n on field" (the next-play lineup). Line 2 is "need plays · met · unavailable", which partitions the roster and always sums to the All count. The two lines are kept visually separate because the lineup overlaps the roster categories.
 - **Undo:** The play-recorded toast was removed. The button's success state and the aria-live announcement replace it, and Undo moved to a persistent `↶ UNDO n` chip on the status line. The chip uses the same `undoLastPlay` command, and the "Play n undone · RESTORE" toast is kept. Toasts are positioned above the measured height of the record controls, so they never cover Record Play.
 - **Deviation — dark mode:** The app has no dark theme. PRD §32 makes it a light, high-contrast, sunlight-first UI, and building a whole dark theme was outside this change. The new colours were checked for contrast against both light and dark surfaces (`tests/unit/contrast.test.ts`).
+
+## 17. iPhone date field, de-duplicated lineup count, toolbar redesign
+- **Date field overflow:**
+  - **Root cause:** Every `.input` is a flex item in the column-flex `.field`, so it had `min-width: auto` (its intrinsic content width). iOS Safari gives a native `<input type="date">` a large intrinsic width and a centred value, so `width: 100%` could not shrink it.
+  - **Fix:** `min-width: 0` on all form controls, plus `appearance: none` and a left-aligned value for date/time input types. The native picker still opens.
+  - **Audit:** This is the only date input in the app (Game Details), and the rule covers any future date/time input.
+  - **Verification:** Edge alignment with the Opponent and Deadline fields at 320, 375, 390 and 430px, in Chromium and in WebKit with iPhone emulation.
+- **Lineup count shown once:**
+  - The bottom "n on field" text and the amber "n of 11 players selected" line were removed. The header badge (`✓ 11/11 ON FIELD`, `▼ 3/11 TOO FEW`, `▲ 12/11 TOO MANY`) is the single indicator; it uses colour, an icon and words.
+  - The actual safeguard, the "Record play with n players?" confirmation, is unchanged.
+  - The status line now carries only the MPR roster breakdown (need plays · met · unavailable) and the Undo chip.
+- **Toolbar:**
+  - Presets scroll inside their own region, which ends at a divider. They are clipped there and are never drawn under the fixed controls.
+  - The edge of the region that has more presets beyond it gets a 24px gradient fade (left and/or right, updated on scroll and resize). Presets snap gently.
+  - The fixed group is two matching 48px square tool buttons: an eraser icon labelled CLEAR, accessible name "Clear field selection (mark everyone out)", and the GRID/LIST toggle. A small caption is kept under each icon for unambiguous meaning on first use.
+  - Clear is disabled (dimmed) when nobody is selected. That is its only visual distinction: it is fully undoable, so it does not warrant warning colours.
+- **Dark mode:** As before, the app is light-only (see #16). These changes add no dark-theme-specific styling.
+- **Test infrastructure:** A second Playwright project, `iphone-webkit`, runs the date-field checks in the Safari engine.

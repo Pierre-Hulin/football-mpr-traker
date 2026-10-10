@@ -322,12 +322,34 @@ textarea {
 .select,
 .textarea {
   width: 100%;
+  /* Flex items default to min-width:auto (their intrinsic content width);
+     reset it so form controls always fit their column, whatever their content. */
+  min-width: 0;
   min-height: var(--tap);
   padding: var(--space-2) var(--space-3);
   border: 2px solid var(--border-strong);
   border-radius: var(--radius);
   background: var(--surface);
   font-size: 1rem;
+}
+/*
+ * Native date/time inputs: iOS Safari gives them a large intrinsic width and a
+ * centred value, which overflows the field. Dropping the native appearance makes
+ * them size like every other .input while keeping the native picker on tap.
+ */
+.input[type="date"],
+.input[type="time"],
+.input[type="datetime-local"],
+.input[type="month"],
+.input[type="week"] {
+  -webkit-appearance: none;
+  appearance: none;
+  display: block;
+  line-height: 1.4;
+}
+.input::-webkit-date-and-time-value {
+  text-align: left;
+  min-height: 1.4em;
 }
 .textarea {
   min-height: 180px;

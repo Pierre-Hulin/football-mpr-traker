@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { createTeamWithRoster, range, record, row, selectPlayers, startGame, toggle } from "./helpers";
+import { createTeamWithRoster, expectLineupSaved, range, record, row, selectPlayers, startGame, toggle } from "./helpers";
 
 const tile = (page: Page, jersey: number) => page.locator(`[data-testid=player-tile][data-jersey="${jersey}"] button`);
 const statusRow = (page: Page, jersey: number) => page.locator(`[data-testid=status-row][data-jersey="${jersey}"]`);
@@ -42,7 +42,7 @@ test("Clear → toast expires → Restore lineup brings back the exact lineup", 
   await expect(page.getByTestId("selected-count")).toContainText("11/11");
   await expect(page.getByTestId("restore-lineup")).toHaveCount(0);
 
-  await page.getByRole("button", { name: /Clear lineup/ }).click();
+  await page.getByRole("button", { name: /Clear field selection/ }).click();
   await expect(page.getByTestId("selected-count")).toContainText("0/11");
   await expect(page.getByTestId("toast")).toBeHidden({ timeout: 8000 });
 
@@ -58,15 +58,16 @@ test("Clear → reload → Restore lineup still offered; recording a play retire
   await createTeamWithRoster(page);
   await startGame(page);
   await selectPlayers(page, range(1, 11));
-  await page.getByRole("button", { name: /Clear lineup/ }).click();
+  await page.getByRole("button", { name: /Clear field selection/ }).click();
   await expect(page.getByTestId("restore-lineup")).toBeVisible();
+  await expectLineupSaved(page);
   await page.reload();
   await expect(page.getByTestId("restore-lineup")).toHaveText("↺ RESTORE 11");
   await page.getByTestId("restore-lineup").click();
   await expect(page.getByTestId("selected-count")).toContainText("11/11");
 
   // Clear again, rebuild by hand, record: the snapshot is now stale and disappears.
-  await page.getByRole("button", { name: /Clear lineup/ }).click();
+  await page.getByRole("button", { name: /Clear field selection/ }).click();
   await selectPlayers(page, range(4, 14));
   await expect(page.getByTestId("restore-lineup")).toBeVisible();
   await record(page, 2);
@@ -105,6 +106,7 @@ test("Grid and List share one lineup; view preference persists", async ({ page }
   await expect(tile(page, 9)).toContainText("1/8");
 
   // Preference survives reload.
+  await expectLineupSaved(page);
   await page.reload();
   await expect(page.getByTestId("roster-grid")).toBeVisible();
   await expect(tile(page, 9)).toHaveAttribute("aria-pressed", "true");

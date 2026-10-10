@@ -112,6 +112,8 @@ export default function LiveGamePage() {
    */
   const [sticky, setSticky] = useState<Set<string>>(new Set());
   const footerRef = useRef<HTMLElement>(null);
+  const presetScrollRef = useRef<HTMLDivElement>(null);
+  const [presetFade, setPresetFade] = useState({ left: false, right: false });
 
   const isActive = view?.game.status === "active";
   const { conflict, takeOver } = useGameLock(gameId, !!isActive);
@@ -136,6 +138,24 @@ export default function LiveGamePage() {
     ro.observe(el);
     return () => ro.disconnect();
   }, [view?.game.id]);
+
+  // Fade whichever edge of the preset scroller has more presets beyond it.
+  const updatePresetFade = useCallback(() => {
+    const el = presetScrollRef.current;
+    if (!el) return;
+    const left = el.scrollLeft > 2;
+    const right = el.scrollLeft + el.clientWidth < el.scrollWidth - 2;
+    setPresetFade((f) => (f.left === left && f.right === right ? f : { left, right }));
+  }, []);
+  useEffect(() => {
+    const el = presetScrollRef.current;
+    if (!el) return;
+    updatePresetFade();
+    if (typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(updatePresetFade);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [view?.game.id, data?.presets.length, view?.game.clearedLineup, updatePresetFade]);
 
   const setFilter = useCallback(
     (next: RosterFilter) => {
@@ -546,7 +566,12 @@ export default function LiveGamePage() {
       )}
 
       <nav className="preset-bar" aria-label="Lineup actions">
-        <div className="preset-scroll">
+        <div
+          className={`preset-scroll ${presetFade.left ? "fade-left" : ""} ${presetFade.right ? "fade-right" : ""}`}
+          ref={presetScrollRef}
+          onScroll={updatePresetFade}
+          data-testid="preset-scroll"
+        >
           {restoreCount > 0 && (
             <button
               type="button"
@@ -574,13 +599,21 @@ export default function LiveGamePage() {
             );
           })}
         </div>
-        <div className="preset-fixed">
-          <button type="button" className="preset-btn clear" onClick={onClear} aria-label="Clear lineup (mark everyone out)">
-            CLEAR
+        <div className="preset-fixed" data-testid="toolbar-fixed">
+          <button
+            type="button"
+            className="tool-btn"
+            onClick={onClear}
+            disabled={selectedCount === 0}
+            aria-label="Clear field selection (mark everyone out)"
+            data-testid="clear-lineup"
+          >
+            <EraserIcon />
+            <span>CLEAR</span>
           </button>
           <button
             type="button"
-            className="view-toggle"
+            className="tool-btn"
             onClick={toggleView}
             aria-label={isGrid ? "Switch to list view (names and details)" : "Switch to grid view (jersey numbers only)"}
             data-testid="view-toggle"
@@ -667,25 +700,24 @@ export default function LiveGamePage() {
             className="game-summary"
             data-testid="game-summary"
             aria-label={
-              `${summary.onField} on the field for the next play. Roster of ${summary.total}: ` +
-              `${summary.needPlays} still need plays, ${summary.met} met the minimum, ${summary.unavailable} unavailable.`
+              `Roster of ${summary.total}: ${summary.needPlays} still need plays, ` +
+              `${summary.met} met the minimum, ${summary.unavailable} unavailable.`
             }
           >
-            <span className="gs-field">
-              <b>{summary.onField}</b> on field
+            <span>
+              <b>{summary.needPlays}</b> need plays
             </span>
-            <span className="gs-roster">
-              <span>
-                <b>{summary.needPlays}</b> need plays
-              </span>
-              <span aria-hidden="true"> · </span>
-              <span>
-                <b>{summary.met}</b> met
-              </span>
-              <span aria-hidden="true"> · </span>
-              <span>
-                <b>{summary.unavailable}</b> unavailable
-              </span>
+            <span className="gs-sep" aria-hidden="true">
+              ·
+            </span>
+            <span>
+              <b>{summary.met}</b> met
+            </span>
+            <span className="gs-sep" aria-hidden="true">
+              ·
+            </span>
+            <span>
+              <b>{summary.unavailable}</b> unavailable
             </span>
           </p>
           {view.lastPlay && (
@@ -700,12 +732,6 @@ export default function LiveGamePage() {
             </button>
           )}
         </div>
-        {cs !== "exact" && (
-          <p className="lineup-warning" role="status" data-testid="lineup-warning">
-            <span aria-hidden="true">{cs === "under" ? "⚠" : "▲"}</span> {selectedCount} of {view.expected} players selected
-            {cs === "over" ? " (too many)" : ""}
-          </p>
-        )}
         <div className="record-actions">
           <button
             type="button"
@@ -948,6 +974,27 @@ function ListIcon() {
           <rect x="7" y={y - 1.5} width="14" height="3" rx="1.5" fill="currentColor" />
         </g>
       ))}
+    </svg>
+  );
+}
+
+function EraserIcon() {
+  return (
+    <svg
+      width="22"
+      height="22"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path d="M14.6 3.6a1.8 1.8 0 0 1 2.5 0l3.3 3.3a1.8 1.8 0 0 1 0 2.5L11 18.8H6.8l-3.2-3.2a1.8 1.8 0 0 1 0-2.5z" />
+      <path d="M8.4 9.8l5.8 5.8" />
+      <path d="M11 18.8h9.5" />
     </svg>
   );
 }
