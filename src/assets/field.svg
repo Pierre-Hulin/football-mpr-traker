@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 800" preserveAspectRatio="xMidYMin slice">
+  <defs>
+    <pattern id="stripes" width="480" height="160" patternUnits="userSpaceOnUse">
+      <rect width="480" height="80" fill="#2e7d32"/>
+      <rect y="80" width="480" height="80" fill="#296f2d"/>
+    </pattern>
+    <pattern id="hash" width="480" height="16" patternUnits="userSpaceOnUse">
+      <rect x="0" y="7" width="14" height="2" fill="#fff" opacity=".7"/>
+      <rect x="170" y="7" width="12" height="2" fill="#fff" opacity=".7"/>
+      <rect x="298" y="7" width="12" height="2" fill="#fff" opacity=".7"/>
+      <rect x="466" y="7" width="14" height="2" fill="#fff" opacity=".7"/>
+    </pattern>
+    <radialGradient id="light" cx="50%" cy="0%" r="75%">
+      <stop offset="0" stop-color="#fff" stop-opacity=".22"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="480" height="800" fill="url(#stripes)"/>
+  <rect width="480" height="800" fill="url(#hash)"/>
+  <g fill="#fff" opacity=".85">
+    <rect y="79" width="480" height="3"/>
+    <rect y="239" width="480" height="3"/>
+    <rect y="399" width="480" height="3"/>
+    <rect y="559" width="480" height="3"/>
+    <rect y="719" width="480" height="3"/>
+  </g>
+  <g fill="#fff" opacity=".55" font-family="Arial Black, Arial, sans-serif" font-weight="900" font-size="34">
+    <text x="40" y="253" transform="rotate(90 40 253)">3 0</text>
+    <text x="40" y="413" transform="rotate(90 40 413)">4 0</text>
+    <text x="40" y="573" transform="rotate(90 40 573)">5 0</text>
+    <text x="440" y="226" transform="rotate(-90 440 226)">3 0</text>
+    <text x="440" y="386" transform="rotate(-90 440 386)">4 0</text>
+    <text x="440" y="546" transform="rotate(-90 440 546)">5 0</text>
+  </g>
+  <rect width="480" height="800" fill="url(#light)"/>
+</svg>

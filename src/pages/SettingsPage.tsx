@@ -6,8 +6,8 @@ import { UpdateBanner } from "../components/UpdateBanner";
 import { useToast } from "../components/Toast/ToastProvider";
 import { updateAppSettings, useAppSettings } from "../hooks/useAppSettings";
 import { useInstallPrompt } from "../hooks/useInstallPrompt";
-import { useServiceWorkerState } from "../pwa/registerSW";
-import { APP_VERSION, buildBackupFile, clearAllData, previewBackup, replaceAllData, type BackupPreview } from "../domain/services/backupService";
+import { BUILD_LABEL, useServiceWorkerState } from "../pwa/registerSW";
+import { buildBackupFile, clearAllData, previewBackup, replaceAllData, type BackupPreview } from "../domain/services/backupService";
 import { isWakeLockSupported } from "../domain/services/wakeLockService";
 import { LIVE_ROSTER_VIEWS, PLAYER_SORTS, type PlayerSort } from "../domain/enums";
 import { toUserMessage } from "../domain/errors";
@@ -169,7 +169,7 @@ export default function SettingsPage() {
           </div>
           <div className="row-between">
             <span>Version</span>
-            <strong>{APP_VERSION}</strong>
+            <strong data-testid="settings-version">{BUILD_LABEL}</strong>
           </div>
           {install.canInstall && (
             <button type="button" className="btn btn-primary btn-block" onClick={() => void install.install()}>

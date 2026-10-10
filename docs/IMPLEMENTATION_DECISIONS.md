@@ -128,3 +128,24 @@ Deviations from `MPR-PRD.md`, `01_DATA_MODEL.md`, `02_SCREEN_FLOW.md` and `03_IM
   - Clear is disabled (dimmed) when nobody is selected. That is its only visual distinction: it is fully undoable, so it does not warrant warning colours.
 - **Dark mode:** As before, the app is light-only (see #16). These changes add no dark-theme-specific styling.
 - **Test infrastructure:** A second Playwright project, `iphone-webkit`, runs the date-field checks in the Safari engine.
+
+## 18. Landing page, install prompt, and reliable PWA updates
+- **Landing page:**
+  - A dark hero band carries the app icon, title and one-line purpose over a football-field illustration (`src/assets/field.svg`: turf stripes, yard lines, hash marks, numbers). A navy gradient overlay plus a text shadow keeps the white text high-contrast.
+  - The same artwork appears as a 93–97% washed-out texture behind the light content area.
+  - Vite inlines the small SVG into the precached CSS, so it costs no extra request and works offline.
+  - All existing actions, flows and test IDs are unchanged. The first-run list became a numbered "Get ready in a minute" card.
+- **Install prompt** (`components/InstallPrompt`, built on the existing `useInstallPrompt` hook):
+  - **Collapsed:** a compact floating bar on the landing page ("Install MPR Tracker: one tap from your Home Screen · full screen · works offline"). The page reserves room for it, so no action is ever stuck underneath. On ≤360px screens it drops the icon to stay two short rows.
+  - **Native install** (Chrome/Android/desktop): `beforeinstallprompt` drives an "Install app" button, with "Why?" listing the benefits. An accepted install is remembered.
+  - **iPhone/iPad:** "Show me how" expands into the benefits plus three steps (Share → Add to Home Screen → Add), worded for Safari's toolbar or for Share next to the address bar in Chrome/Firefox/Edge on iOS.
+  - **When it shows:** never when running standalone or after an install; never while a game is in progress; never on browsers with no install path. "Not now" or ✕ snoozes it for 14 days (in localStorage, guarded for private mode). It is a labelled region, not a modal: it does not steal focus or trap keyboard users.
+- **Why devices could show an old build after a deploy:**
+  - Cloudflare served `sw.js` with `Cache-Control: max-age=14400`.
+  - The app only checked for updates on load, and an installed iOS PWA usually resumes from the background rather than reloading.
+  - Even once found, an update waits for the user to tap "Update now" (deliberately, so a game is never interrupted).
+- **Fixes:**
+  - `public/_headers` sets `no-cache` on `sw.js`, workbox, the manifest and the HTML shell, and `immutable` on hashed `/assets/*`.
+  - The service worker re-checks for updates on returning to the foreground, on reconnecting, and hourly.
+  - Every build shows a label, "v0.1.0 · <commit> · <date>", at the bottom of the landing page and in Settings, so the build a device is running can be identified at a glance. The commit comes from `CF_PAGES_COMMIT_SHA`, then `GITHUB_SHA`, then `git`.
+- **The earlier "changes missing" screenshots (10:30/10:32, Oct 10)** were taken before `9d753fd` was pushed at 11:58. Production now serves that build: its bundle contains the eraser Clear button, the preset fade and the date-field CSS, and no longer contains the lineup warning.
