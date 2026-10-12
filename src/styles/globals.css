@@ -494,6 +494,19 @@ details.disclosure[open] > summary::before {
   color: var(--text);
   border-color: var(--border-strong);
 }
+/* Falling behind: informational, deliberately quiet (no fill, no warning colour on the text). */
+.badge-behind {
+  background: transparent;
+  color: var(--text-muted);
+  border-color: var(--border-strong);
+}
+.badge-behind::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #d99a00;
+}
 .badge-at_risk {
   background: var(--warn-bg);
   color: var(--warn);

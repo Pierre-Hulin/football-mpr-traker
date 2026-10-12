@@ -32,7 +32,16 @@ function PlayerTileImpl({ view, inLineup, flash, onToggle, onOpen }: PlayerTileP
   const available = view.fieldEligible;
   const risk = status === "active" ? view.risk.level : "excluded";
   const met = status === "active" && view.risk.level === "met";
-  const riskWord = risk === "critical" ? ", critical" : risk === "at_risk" ? ", at risk" : met ? ", minimum met" : "";
+  const RISK_WORDS: Partial<Record<typeof risk, string>> = {
+    missed: ", missed minimum",
+    critical: ", critical",
+    at_risk: ", at risk",
+    behind: ", falling behind",
+    met: ", minimum met",
+  };
+  const riskWord = RISK_WORDS[risk] ?? "";
+  // Strong treatment only when action is needed; blue/white stays the IN/OUT signal.
+  const flag = risk === "missed" || risk === "critical" ? "critical" : risk === "at_risk" ? "at_risk" : null;
 
   const label = available
     ? `#${player.jerseyNumber} ${player.displayName}, ${inLineup ? "IN" : "OUT"}, ${view.count} of ${view.required} minimum plays${riskWord}`
@@ -41,7 +50,7 @@ function PlayerTileImpl({ view, inLineup, flash, onToggle, onOpen }: PlayerTileP
   const classes = [
     "ptile",
     available ? (inLineup ? "in" : "out") : status === "late" ? "late" : "unavailable",
-    risk === "critical" || risk === "at_risk" ? `risk-${risk}` : "",
+    flag ? `risk-${flag}` : "",
     flash ? "flash" : "",
   ]
     .filter(Boolean)
@@ -61,9 +70,9 @@ function PlayerTileImpl({ view, inLineup, flash, onToggle, onOpen }: PlayerTileP
             ✓
           </span>
         )}
-        {(risk === "critical" || risk === "at_risk") && (
-          <span className={`pt-flag ${risk}`} aria-hidden="true">
-            {risk === "critical" ? "!" : "⚠"}
+        {flag && (
+          <span className={`pt-flag ${flag}`} aria-hidden="true">
+            {risk === "missed" ? "✕" : flag === "critical" ? "!" : "⚠"}
           </span>
         )}
         <span className="pt-num" aria-hidden="true">
@@ -73,6 +82,7 @@ function PlayerTileImpl({ view, inLineup, flash, onToggle, onOpen }: PlayerTileP
           {status === "active" ? (
             <>
               {met ? "✓" : ""}
+              {risk === "behind" && <span className="pt-behind" />}
               {view.count}/{view.required}
             </>
           ) : (

@@ -149,3 +149,27 @@ Deviations from `MPR-PRD.md`, `01_DATA_MODEL.md`, `02_SCREEN_FLOW.md` and `03_IM
   - The service worker re-checks for updates on returning to the foreground, on reconnecting, and hourly.
   - Every build shows a label, "v0.1.0 · <commit> · <date>", at the bottom of the landing page and in Settings, so the build a device is running can be identified at a glance. The commit comes from `CF_PAGES_COMMIT_SHA`, then `GITHUB_SHA`, then `git`.
 - **The earlier "changes missing" screenshots (10:30/10:32, Oct 10)** were taken before `9d753fd` was pushed at 11:58. Production now serves that build: its bundle contains the eraser Clear button, the preset fade and the date-field CSS, and no longer contains the lineup warning.
+
+## 19. v1.0.0: semantic versioning and progressive MPR urgency
+- **Versioning:** `package.json` is the single source of truth (now `1.0.0`). The build injects it, with the commit id, into the landing-page/Settings build label and into exported backups (`appVersion`). Semver rules and the release history are in `CHANGELOG.md`; releases are cut with `npm version <major|minor|patch>`.
+- **Risk levels** (supersedes #1). Counting, eligibility, roster and recording logic are unchanged; only the derived `risk.level` and its presentation changed.
+
+  | Level | Shown as | Meaning |
+  |---|---|---|
+  | `needs_plays` | count only | Short but on track |
+  | `behind` | small amber dot (grid) / quiet badge (list) | Falling behind; informational |
+  | `at_risk` | amber border + ⚠ | Needs a large share of the remaining plays |
+  | `critical` | red border + ! | Needs nearly every remaining play |
+  | `missed` | red border + ✕ | Deadline has passed and still short |
+
+- **How urgency is computed:**
+  - Remaining qualifying plays before the deadline are estimated as a range (low / expected / high). The spread is ±40% in Q1, narrowing to ±15% once three quarters of data exist.
+  - "Need" is the remaining requirement divided by one end of that range: the optimistic end early (so it doesn't cry wolf), the expected value in Q2, and the conservative end in Q3 and Q4 (so warnings come in time).
+  - Thresholds tighten by phase. Phases are relative to the configured deadline, so a halftime deadline escalates earlier.
+    - **Q1:** silent unless the requirement exceeds even the optimistic estimate.
+    - **Q2:** "behind" for players off pace or needing ≥45% of the remaining plays. At risk from 75%, critical from 100%. Zero plays alone is never critical.
+    - **Q3:** behind ≥35%, at risk ≥60%, critical ≥90%, judged against the conservative estimate.
+    - **Q4 (deadline):** every short player is at least "behind"; at risk ≥30%, critical ≥60%.
+  - **"Missed" is reported only after the deadline has passed.** Before that, the number of remaining plays is not knowable, so the app never claims a player cannot make it; critical reasons say "keep on the field every play" instead.
+- **Banner:** hidden unless intervention is justified. Red ("PLAY NOW") for any critical or missed player at any time. Amber for at-risk players only from the second-to-last quarter before the deadline (Q3 for an end-of-game deadline). "Behind" never raises it.
+- **Thresholds** live in `DEFAULT_RISK_CONFIG` (`src/domain/services/riskEngine.ts`) for tuning from real games.

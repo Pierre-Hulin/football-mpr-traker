@@ -14,7 +14,7 @@ const buildId = typeof __BUILD_ID__ === "string" ? __BUILD_ID__ : "dev";
 const buildTime = typeof __BUILD_TIME__ === "string" ? __BUILD_TIME__ : "";
 const appVersion = typeof __APP_VERSION__ === "string" ? __APP_VERSION__ : "dev";
 
-/** Identifies exactly which build a device is running, e.g. "v0.1.0 · 9d753fd · Oct 10". */
+/** Identifies exactly which build a device is running, e.g. "v1.0.0 · 9d753fd · Oct 10". */
 export const BUILD_LABEL = [
   `v${appVersion}`,
   buildId,

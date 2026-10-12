@@ -703,6 +703,19 @@ body.is-live {
   background: #ffc21a;
   color: #1a1200;
 }
+/* "Behind": a small dot beside the count, with no border or corner flag. */
+.ptile .pt-behind {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 3px;
+  border-radius: 50%;
+  background: #d99a00;
+  vertical-align: 1px;
+}
+.ptile.in .pt-behind {
+  background: #ffc21a;
+}
 .ptile.unavailable {
   background: repeating-linear-gradient(135deg, var(--surface-2), var(--surface-2) 6px, var(--muted-bg) 6px, var(--muted-bg) 12px);
   border-style: dashed;

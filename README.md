@@ -33,6 +33,11 @@ Repositories (src/db/repositories) → Dexie (src/db/db.ts) → IndexedDB
 - The current lineup is persisted on every toggle, so a reload resumes exactly where the user left off.
 - Service worker updates are never applied during an active game.
 
+## Versioning
+Semantic versioning, with `package.json` as the single source of truth. The landing page and Settings show
+`v<version> · <commit> · <date>`, so you can tell which build a device is running. Release with
+`npm version <major|minor|patch>` and record changes in [CHANGELOG.md](CHANGELOG.md).
+
 ## Deploy (Cloudflare Pages)
 - Build command: `npm run build`
 - Output directory: `dist`

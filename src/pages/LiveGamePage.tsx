@@ -462,7 +462,7 @@ export default function LiveGamePage() {
   };
 
   const scrollToRisk = () => {
-    const first = view?.atRisk[0];
+    const first = view?.banner?.rows[0] ?? view?.atRisk[0];
     if (!first) return;
     document.getElementById(`player-${first.player.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
     setFlashId(first.player.id);
@@ -487,7 +487,7 @@ export default function LiveGamePage() {
   const { game } = view;
   const cs = countState(selectedCount, view.expected);
   const presets = [...data.presets].sort((a, b) => a.sortOrder - b.sortOrder);
-  const critical = view.atRisk.filter((r) => r.risk.level === "critical");
+  const banner = view.banner;
   const sheetView = sheetPlayerId ? view.rowsById.get(sheetPlayerId) : undefined;
   const countIcon = cs === "exact" ? "✓ " : cs === "under" ? "▼ " : "▲ ";
   const isGrid = settings.liveRosterView === "grid";
@@ -533,33 +533,34 @@ export default function LiveGamePage() {
         </button>
       </header>
 
-      {view.atRisk.length > 0 && (
+      {banner && (
         <button
           type="button"
-          className={`risk-banner ${critical.length ? "critical" : "at_risk"}`}
+          className={`risk-banner ${banner.tone}`}
           onClick={scrollToRisk}
           data-testid="risk-banner"
+          data-tone={banner.tone}
         >
           <span aria-hidden="true" style={{ fontSize: "1.3rem" }}>
-            {critical.length ? "!" : "⚠"}
+            {banner.tone === "critical" ? "!" : "⚠"}
           </span>
           <span className="rb-text">
             <span>
-              {critical.length
-                ? `CRITICAL: ${critical
+              {banner.tone === "critical"
+                ? `PLAY NOW: ${banner.rows
+                    .filter((r) => r.risk.level !== "at_risk")
                     .slice(0, 2)
-                    .map((r) => `#${r.player.jerseyNumber} NEEDS ${r.remaining}`)
-                    .join(" · ")}${critical.length > 2 ? ` +${critical.length - 2}` : ""}`
-                : `${view.atRisk.length} ${view.atRisk.length === 1 ? "PLAYER" : "PLAYERS"} AT RISK`}
+                    .map((r) => `#${r.player.jerseyNumber} ${r.risk.level === "missed" ? "MISSED" : `NEEDS ${r.remaining}`}`)
+                    .join(" · ")}`
+                : `${banner.rows.length} ${banner.rows.length === 1 ? "PLAYER" : "PLAYERS"} AT RISK`}
             </span>
             <span className="rb-detail">
-              {critical.length && view.atRisk.length > critical.length
-                ? `+${view.atRisk.length - critical.length} at risk · `
-                : ""}
-              {(critical.length ? view.atRisk.filter((r) => r.risk.level === "at_risk") : view.atRisk)
+              {banner.rows
+                .slice(banner.tone === "critical" ? 2 : 0)
                 .slice(0, 4)
                 .map((r) => `#${r.player.jerseyNumber} needs ${r.remaining}`)
                 .join(" · ")}
+              {banner.rows.length > (banner.tone === "critical" ? 6 : 4) ? " …" : ""}
             </span>
           </span>
         </button>

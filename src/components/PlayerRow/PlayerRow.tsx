@@ -2,6 +2,7 @@ import { memo } from "react";
 import { GAME_PLAYER_STATUS_LABELS } from "../../domain/enums";
 import type { PlayerView } from "../../domain/selectors/getGameState";
 import { RiskBadge } from "../RiskBadge/RiskBadge";
+import { isActionable } from "../../domain/services/riskEngine";
 
 interface PlayerRowProps {
   view: PlayerView;
@@ -29,9 +30,7 @@ function StatusLine({ view }: { view: PlayerView }) {
         ) : (
           <>
             <span>NEEDS {view.remaining}</span>
-            {(view.risk.level === "at_risk" || view.risk.level === "critical") && (
-              <RiskBadge level={view.risk.level} remaining={view.remaining} />
-            )}
+            {view.risk.level !== "needs_plays" && <RiskBadge level={view.risk.level} remaining={view.remaining} />}
           </>
         )}
       </>
@@ -50,7 +49,9 @@ function PlayerRowImpl({ view, inLineup, flash, disabled, onToggle, onOpen, onAc
   const { player, gamePlayer } = view;
   const status = gamePlayer.status;
   const unavailable = !view.fieldEligible;
-  const riskCls = status === "active" && (view.risk.level === "critical" || view.risk.level === "at_risk") ? view.risk.level : "";
+  // Only actionable risk changes the row border; "behind" is just a quiet badge.
+  const riskCls =
+    status === "active" && isActionable(view.risk.level) ? (view.risk.level === "at_risk" ? "at_risk" : "critical") : "";
   const name = `#${player.jerseyNumber} ${player.displayName}`;
 
   return (

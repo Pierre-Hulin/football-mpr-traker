@@ -20,7 +20,8 @@ export const GAME_PLAYER_STATUS_LABELS: Record<GamePlayerStatus, string> = {
   ineligible: "Ineligible",
 };
 
-export type MprRiskLevel = "met" | "needs_plays" | "at_risk" | "critical" | "excluded";
+/** Derived MPR status. `needs_plays` = short but on track; `missed` only after the deadline has passed. */
+export type MprRiskLevel = "met" | "needs_plays" | "behind" | "at_risk" | "critical" | "missed" | "excluded";
 
 export const EVENT_TYPES = [
   "game_started",

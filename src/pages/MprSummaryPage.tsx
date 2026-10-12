@@ -10,9 +10,11 @@ import { useGameView } from "../hooks/useActiveGame";
 import { PlayerSheet } from "./live/PlayerSheet";
 
 const GROUPS: { level: MprRiskLevel; title: string }[] = [
+  { level: "missed", title: "Missed (deadline passed)" },
   { level: "critical", title: "Critical" },
   { level: "at_risk", title: "At risk" },
-  { level: "needs_plays", title: "Needs plays" },
+  { level: "behind", title: "Falling behind" },
+  { level: "needs_plays", title: "On track" },
   { level: "met", title: "Met" },
   { level: "excluded", title: "Excluded / unavailable" },
 ];

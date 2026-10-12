@@ -12,7 +12,7 @@ import type {
   QuarterSnapshot,
   Team,
 } from "../models";
-import { evaluatePlayerRisk, RISK_ORDER, type RiskResult } from "../services/riskEngine";
+import { evaluatePlayerRisk, isActionable, RISK_ORDER, riskPhase, type RiskResult } from "../services/riskEngine";
 import {
   computeMprCounts,
   computeQuarterCounts,
@@ -61,8 +61,10 @@ export interface GameView {
   rowsById: Map<string, PlayerView>;
   selectedCount: number;
   expected: number;
-  /** Critical first, then at risk; stable jersey order within each level. */
+  /** Actionable players (missed, critical, at risk), most urgent first, jersey order within each level. */
   atRisk: PlayerView[];
+  /** Proportionate live warning banner, or null when no intervention is needed. */
+  banner: RiskBanner | null;
   playsByQuarter: Record<number, number>;
   qualifyingTotal: number;
   plays: PlayView[];
@@ -145,7 +147,7 @@ export function buildGameView(data: GameData, sort: PlayerSort = "jersey"): Game
   });
 
   const atRisk = rows
-    .filter((r) => r.risk.level === "critical" || r.risk.level === "at_risk")
+    .filter((r) => isActionable(r.risk.level))
     .sort((a, b) => RISK_ORDER[a.risk.level] - RISK_ORDER[b.risk.level] || comparePlayers(a.player, b.player));
 
   const plays = buildPlayViews(data.plays, data.participants);
@@ -158,6 +160,7 @@ export function buildGameView(data: GameData, sort: PlayerSort = "jersey"): Game
     selectedCount: rows.filter((r) => r.inLineup).length,
     expected: game.expectedPlayersOnField,
     atRisk,
+    banner: getRiskBanner(atRisk, game.currentQuarter, deadlineQuarter),
     playsByQuarter,
     qualifyingTotal,
     plays,
@@ -212,4 +215,28 @@ export function summarizeRoster(rows: PlayerView[], isIn: (playerId: string) => 
     else needPlays++;
   }
   return { onField, needPlays, met, unavailable, total: rows.length };
+}
+
+// ---------- Live warning banner ----------
+
+export interface RiskBanner {
+  tone: "critical" | "at_risk";
+  /** Urgent players first (missed, critical), then at risk. */
+  rows: PlayerView[];
+}
+
+/**
+ * The banner appears only when intervention is justified: always for missed or
+ * critical players, and for at-risk players only from the second-to-last
+ * quarter before the deadline onward. "Behind" never triggers it; that stays an
+ * inline cue.
+ */
+export function getRiskBanner(atRisk: PlayerView[], currentQuarter: number, deadlineQuarter: number): RiskBanner | null {
+  const urgent = atRisk.filter((r) => r.risk.level === "critical" || r.risk.level === "missed");
+  const phase = riskPhase(currentQuarter, deadlineQuarter);
+  const lateGame = phase === "late" || phase === "deadline" || phase === "past";
+  const amber = lateGame ? atRisk.filter((r) => r.risk.level === "at_risk") : [];
+  if (urgent.length) return { tone: "critical", rows: [...urgent, ...amber] };
+  if (amber.length) return { tone: "at_risk", rows: amber };
+  return null;
 }
